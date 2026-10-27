@@ -1,0 +1,22 @@
+# Videos must never go in the repo
+*.mp4
+*.mov
+*.mkv
+
+# Private keys / secrets (the public firebase-config.js is allowed)
+*serviceAccount*.json
+*service-account*.json
+*-adminsdk-*.json
+.env
+.env.*
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
