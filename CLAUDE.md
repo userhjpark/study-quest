@@ -4,7 +4,7 @@ Guidance for Claude Code in this repository. Read fully at the start of every se
 
 ## Project
 
-**Study Quest**: a study-game website for a university assignment (deadline **November 1**). Students who struggle with motivation enter "concept - definition" pairs for any subject; the site turns them into quizzes and wraps studying in game mechanics. **No AI, no paid APIs. Everything must be free to run.**
+**Study Quest**: a study-game website for a university assignment (deadline **November 1, 23:59 KST**). Students who struggle with motivation enter "concept - definition" pairs for any subject; the site turns them into quizzes and wraps studying in game mechanics. **No AI, no paid APIs. Everything must be free to run.**
 
 All code must be written from scratch in this repo. No templates, no reused code from earlier projects, tutorials, or downloaded repositories. Do not copy anything from `../business-agent-lab` (and do not modify it).
 
@@ -16,6 +16,8 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Must work well on phones (mobile-first layout, large tap targets).
 - UI language: English.
 - Timer must be timestamp-based (store the end time, compute remaining time), because mobile browsers throttle background tabs.
+- Opening `index.html` by double-click (`file://`) may not work if scripts use ES modules (browsers block module imports from `file://`). Provide a simple way to run locally (e.g. `python3 -m http.server` from the repo root, then open `http://localhost:8000`) and document it in the README.
+- Logic files are ES modules. Add a tiny `package.json` containing only `{"type":"module"}` so Node can import them for tests (no dependencies, so the no-npm rule still holds).
 - Split files by role (one responsibility per file) so 5 key files can be chosen for grading.
 
 ## Build stages (in this order, one at a time)
@@ -25,9 +27,12 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Multiple-choice quiz: wrong options are *distinct* definitions of other concepts (skip any equal to the correct one). With fewer than 4 concepts, block the quiz and show a message.
 - Missed concepts appear more often in later quizzes. Combo bonus (quiz points) for consecutive correct answers.
 
+**Deploy step (right after Stage 1)**: publish to GitHub Pages so a working deployed URL exists early. Verify it loads and works there, record the URL, then continue to Stage 2.
+
 **Stage 2 (core)**
 - Focus timer: 10 / 15 / 25 min, plus 1 min for demos. When it ends, a quiz starts.
 - XP, levels, coins. Daily check-in and streak bonus.
+- XP and coins come mainly from correct quiz answers. Finishing the timer gives only a small bonus, so leaving the timer running cannot be farmed for XP.
 - Daily XP cap (limits leaderboard cheating).
 
 **Stage 3 (core)**
@@ -80,4 +85,6 @@ All code must be written from scratch in this repo. No templates, no reused code
 
 ## Status
 
-Repo just initialized. No code yet. Next: show file structure and plan in a fresh session, wait for approval.
+**Oct 28 (done):** Rules finalized (deadline Nov 1 23:59 KST, local-run rule, `package.json` module decision, quiz-based XP/coins, early GitHub Pages step). File structure and Stage 1-3 plan approved. Repo connected to https://github.com/userhjpark/study-quest and pushed. No app code yet.
+
+**Next:** Stage 1 (notes + quiz): `index.html`, `css/style.css`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/ui.js`, `js/main.js`, `package.json`, first tests in `tests/logic.test.js`. Then user tests it, commit, then the GitHub Pages deploy step. Stage 4 decision: Oct 30 evening.
