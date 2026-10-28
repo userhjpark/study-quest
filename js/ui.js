@@ -4,20 +4,36 @@
 
 const $ = (id) => document.getElementById(id);
 
+// Separator button names in the HTML -> the real character.
+const SEP_BY_NAME = { ":": ":", "/": "/", tab: "\t" };
+
+let pendingLeave = null;
+
 export function bindEvents(h) {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => h.onTab(btn.dataset.tab));
   });
   $("concept-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    h.onAdd($("term-input").value, $("definition-input").value);
+    h.onAdd($("term-input").value, $("definition-input").value, $("subject-input").value);
   });
+
+  // Bulk import
+  $("bulk-text").addEventListener("input", h.onBulkChange);
+  $("bulk-subject").addEventListener("input", h.onBulkChange);
+  document.querySelectorAll(".sep-btn").forEach((btn) => {
+    btn.addEventListener("click", () => h.onBulkSeparator(SEP_BY_NAME[btn.dataset.sep]));
+  });
+  $("bulk-add-btn").addEventListener("click", h.onBulkAdd);
+
+  // Quiz
+  $("quiz-subject").addEventListener("change", () => h.onQuizSubject($("quiz-subject").value));
   $("start-btn").addEventListener("click", h.onStart);
   $("next-btn").addEventListener("click", h.onNext);
   $("end-btn").addEventListener("click", h.onEnd);
   $("again-btn").addEventListener("click", h.onStart);
 
-  // Leave dialog: Stay (or Esc) just closes it; Leave closes it and runs the saved action.
+  // Leave dialog: "계속하기" (or Esc) just closes it; "나가기" closes it and runs the saved action.
   const dialog = $("leave-dialog");
   $("stay-btn").addEventListener("click", () => dialog.close());
   $("leave-btn").addEventListener("click", () => {
@@ -28,8 +44,6 @@ export function bindEvents(h) {
   });
   dialog.addEventListener("close", () => { pendingLeave = null; });
 }
-
-let pendingLeave = null;
 
 export function askLeave(onLeave) {
   pendingLeave = onLeave;
@@ -44,6 +58,8 @@ export function showTab(name) {
   $("tab-quiz").hidden = name !== "quiz";
 }
 
+/* ---------- Notes ---------- */
+
 export function renderConcepts(concepts, missed, onDelete) {
   const list = $("concept-list");
   list.replaceChildren();
@@ -52,7 +68,7 @@ export function renderConcepts(concepts, missed, onDelete) {
   if (concepts.length === 0) {
     const li = document.createElement("li");
     li.className = "empty";
-    li.textContent = "No concepts yet. Add your first one above.";
+    li.textContent = "아직 개념이 없어요. 위에서 첫 개념을 추가해 보세요.";
     list.append(li);
     return;
   }
@@ -71,18 +87,23 @@ export function renderConcepts(concepts, missed, onDelete) {
     def.textContent = c.definition;
     text.append(term, def);
 
+    const tag = document.createElement("span");
+    tag.className = "subject-tag";
+    tag.textContent = c.subject;
+    text.append(tag);
+
     if (missed[c.id] > 0) {
       const badge = document.createElement("span");
       badge.className = "missed-badge";
-      badge.textContent = `Missed ${missed[c.id]}×`;
+      badge.textContent = `${missed[c.id]}번 틀림`;
       text.append(badge);
     }
 
     const del = document.createElement("button");
     del.type = "button";
     del.className = "delete-btn";
-    del.textContent = "Delete";
-    del.setAttribute("aria-label", "Delete " + c.term);
+    del.textContent = "삭제";
+    del.setAttribute("aria-label", `${c.term} 삭제`);
     del.addEventListener("click", () => onDelete(c.id));
 
     li.append(text, del);
@@ -98,6 +119,123 @@ export function clearForm() {
   $("term-input").value = "";
   $("definition-input").value = "";
   $("term-input").focus();
+}
+
+export function getSubjectInput() {
+  return $("subject-input").value;
+}
+
+export function setSubjectInput(value) {
+  $("subject-input").value = value;
+}
+
+// Suggestions shown while typing a subject (shared by the single form and bulk import).
+export function renderSubjectSuggestions(subjects) {
+  const list = $("subject-list");
+  list.replaceChildren();
+  for (const s of subjects) {
+    const option = document.createElement("option");
+    option.value = s.name;
+    list.append(option);
+  }
+}
+
+/* ---------- Bulk import ---------- */
+
+export function getBulkInput() {
+  return { text: $("bulk-text").value, subject: $("bulk-subject").value };
+}
+
+export function clearBulk() {
+  $("bulk-text").value = "";
+}
+
+export function setBulkStatus(message) {
+  $("bulk-status").textContent = message || "";
+}
+
+// Draws the separator buttons and the preview. `preview` is null when there is no text.
+export function renderBulk({ separator, isManual, preview }) {
+  document.querySelectorAll(".sep-btn").forEach((btn) => {
+    btn.setAttribute("aria-pressed", String(SEP_BY_NAME[btn.dataset.sep] === separator));
+  });
+
+  const box = $("bulk-preview");
+  const addBtn = $("bulk-add-btn");
+  const hint = $("sep-hint");
+
+  if (!preview) {
+    box.hidden = true;
+    addBtn.disabled = true;
+    addBtn.textContent = "추가하기";
+    hint.textContent = "";
+    return;
+  }
+
+  hint.textContent = isManual
+    ? "직접 고른 구분 기호예요."
+    : "구분 기호를 자동으로 골랐어요. 미리보기가 이상할 때만 바꿔 보세요.";
+
+  const { items, counts, toAdd } = preview;
+  box.hidden = false;
+  $("bulk-summary").textContent =
+    `추가 ${counts.ok}개 · 중복 ${counts.duplicate}개 · 오류 ${counts.invalid}개 (중복과 오류는 건너뛰어요)`;
+
+  const list = $("bulk-items");
+  list.replaceChildren();
+  if (items.length === 0) {
+    const li = document.createElement("li");
+    li.className = "preview-item";
+    li.textContent = "읽을 수 있는 줄이 없어요.";
+    list.append(li);
+  }
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.className = "preview-item is-" + item.status;
+
+    const line = document.createElement("span");
+    line.className = "preview-line";
+    line.textContent = `${item.line}줄`;
+
+    const main = document.createElement("span");
+    main.className = "preview-main";
+    // Unreadable lines are shown as typed; readable ones as "concept → definition".
+    main.textContent = item.error ? item.raw.trim() : `${item.term} → ${item.definition}`;
+
+    const reason = document.createElement("span");
+    reason.className = "preview-reason";
+    reason.textContent = item.status === "ok" ? "추가돼요" : item.reason;
+    main.append(reason);
+
+    li.append(line, main);
+    list.append(li);
+  }
+
+  addBtn.disabled = toAdd.length === 0;
+  addBtn.textContent = toAdd.length > 0 ? `${toAdd.length}개 추가하기` : "추가할 개념이 없어요";
+}
+
+/* ---------- Quiz ---------- */
+
+// subjects: [{ name, count }]. `selected` is a subject name or the "all" value.
+export function renderQuizSubjects(subjects, total, selected, allValue) {
+  const select = $("quiz-subject");
+  select.replaceChildren();
+  const all = document.createElement("option");
+  all.value = allValue;
+  all.textContent = `전체 과목 (${total})`;
+  select.append(all);
+  for (const s of subjects) {
+    const option = document.createElement("option");
+    option.value = s.name;
+    option.textContent = `${s.name} (${s.count})`;
+    select.append(option);
+  }
+  select.value = selected;
+}
+
+export function setQuizSubjectEnabled(enabled) {
+  $("quiz-subject").disabled = !enabled;
 }
 
 export function renderStats({ score, combo, correct, total }) {
@@ -118,19 +256,23 @@ function showQuizPart(name) {
   $("quiz-result").hidden = name !== "result";
 }
 
-export function showQuizStart() {
+export function showQuizStart(canStart) {
   showQuizPart("start");
+  $("start-btn").disabled = !canStart;
 }
 
-export function showResult({ score, correct, total, missedTerms }) {
+export function showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect }) {
   showQuizPart("result");
   $("result-score").textContent = String(score);
-  $("result-correct").textContent = `${correct} of ${total} correct`;
+  $("result-correct").textContent = `${total}문제 중 ${correct}문제 정답`;
+  const retry = $("result-retry");
+  retry.hidden = retryTotal === 0;
+  retry.textContent = `다시 풀기: ${retryTotal}문제 중 ${retryCorrect}문제 정답`;
   const list = $("result-missed");
   list.replaceChildren();
   if (missedTerms.length === 0) {
     const li = document.createElement("li");
-    li.textContent = "None. Perfect round!";
+    li.textContent = "없어요. 완벽한 라운드예요!";
     list.append(li);
     return;
   }
@@ -141,9 +283,10 @@ export function showResult({ score, correct, total, missedTerms }) {
   }
 }
 
-export function showQuestion(term, options, onPick, progressText) {
+export function showQuestion(term, options, onPick, progressText, isRetry) {
   showQuizPart("question");
   $("question-progress").textContent = progressText;
+  $("question-progress").classList.toggle("is-retry", isRetry);
   $("question-term").textContent = term;
   $("feedback").textContent = "";
   $("feedback").className = "feedback";
@@ -161,7 +304,7 @@ export function showQuestion(term, options, onPick, progressText) {
   });
 }
 
-export function showAnswerResult({ pickedIndex, correctIndex, message, good, isLast }) {
+export function showAnswerResult({ pickedIndex, correctIndex, message, good, nextLabel }) {
   const buttons = $("options").querySelectorAll(".option");
   buttons.forEach((btn, i) => {
     btn.disabled = true;
@@ -170,7 +313,7 @@ export function showAnswerResult({ pickedIndex, correctIndex, message, good, isL
   });
   $("feedback").textContent = message;
   $("feedback").className = "feedback " + (good ? "good" : "bad");
-  $("next-btn").textContent = isLast ? "See results" : "Next question";
+  $("next-btn").textContent = nextLabel;
   $("next-btn").hidden = false;
   $("next-btn").focus();
 }

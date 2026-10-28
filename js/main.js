@@ -1,47 +1,81 @@
 // Entry point: owns the app state and connects storage, logic and screen.
 
 import { load, save } from "./storage.js";
-import { SAMPLE_CONCEPTS, addConcept, deleteConcept, sanitizeConcepts } from "./concepts.js";
 import {
-  canStartQuiz, pickOptions, pickNextConcept, recordAnswer, nextCombo, pointsForAnswer, roundLength,
+  SAMPLE_CONCEPTS, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
+  listSubjects, filterBySubject,
+} from "./concepts.js";
+import {
+  canStartQuiz, pickOptions, recordAnswer, nextCombo, pointsForAnswer,
+  buildRound, buildRetry, nextStep, progressLabel,
 } from "./quiz.js";
+import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import * as ui from "./ui.js";
 
 function freshRun() {
   return {
-    active: false, // true from "Start" until the result screen (or leaving)
-    length: 0, // questions in this round
-    score: 0, combo: 0, correct: 0, total: 0,
-    lastId: null,
+    active: false, // true from "퀴즈 시작" until the result screen (or leaving)
+    phase: "main", // "main" = the round, "retry" = 다시 풀기 (the wrong ones once more)
+    round: [], // concepts of the main part, in the order they are asked
+    queue: [], // questions of the current part
+    index: 0, // position in `queue`
+    score: 0, combo: 0, correct: 0, total: 0, // main part only; the retry part gives no points
+    retryCorrect: 0, retryTotal: 0,
     current: null, // the question on screen, or null
-    missedIds: [], // concepts answered wrong this round, in order, no duplicates
+    step: null, // what "next" does after this answer: "next" | "retry" | "results"
+    missedIds: [], // concepts answered wrong in the main part, in order, no duplicates
   };
+}
+
+function loadText(key, fallback) {
+  const value = load(key, fallback);
+  return typeof value === "string" ? value : fallback;
 }
 
 const state = {
   tab: "notes",
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
   missed: load("missed", {}),
+  quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
   run: freshRun(),
 };
+
+// Separator the user picked by hand in bulk import. null = auto-detect.
+const bulk = { manualSeparator: null };
 
 function persist() {
   save("concepts", state.concepts);
   save("missed", state.missed);
 }
 
+/* ---------- Notes ---------- */
+
 function refreshNotes() {
   ui.renderConcepts(state.concepts, state.missed, handleDelete);
 }
 
-function handleAdd(term, definition) {
-  const result = addConcept(state.concepts, term, definition);
+// Subject suggestions + the quiz subject picker. Falls back to "all" if the chosen subject is gone.
+function refreshSubjects() {
+  const subjects = listSubjects(state.concepts);
+  if (state.quizSubject !== ALL_SUBJECTS && !subjects.some((s) => s.name === state.quizSubject)) {
+    state.quizSubject = ALL_SUBJECTS;
+    save("quizSubject", state.quizSubject);
+  }
+  ui.renderSubjectSuggestions(subjects);
+  ui.renderQuizSubjects(subjects, state.concepts.length, state.quizSubject, ALL_SUBJECTS);
+}
+
+function handleAdd(term, definition, subject) {
+  const result = addConcept(state.concepts, term, definition, subject);
   ui.setFormError(result.error);
   if (result.error) return;
   state.concepts = result.concepts;
+  save("lastSubject", subject);
   persist();
   ui.clearForm();
   refreshNotes();
+  refreshSubjects();
+  refreshBulk();
 }
 
 function handleDelete(id) {
@@ -49,16 +83,83 @@ function handleDelete(id) {
   delete state.missed[id];
   persist();
   refreshNotes();
+  refreshSubjects();
+  refreshBulk();
+}
+
+/* ---------- Bulk import ---------- */
+
+function currentPreview() {
+  const { text, subject } = ui.getBulkInput();
+  if (text.trim() === "") return null;
+  const separator = bulk.manualSeparator ?? detectSeparator(text);
+  return { separator, subject, preview: buildPreview(parseLines(text, separator), state.concepts, subject) };
+}
+
+function refreshBulk() {
+  const current = currentPreview();
+  if (!current) {
+    bulk.manualSeparator = null; // text was cleared: go back to auto-detect
+    ui.renderBulk({ separator: ":", isManual: false, preview: null });
+    return;
+  }
+  ui.renderBulk({
+    separator: current.separator,
+    isManual: bulk.manualSeparator !== null,
+    preview: current.preview,
+  });
+}
+
+function handleBulkChange() {
+  ui.setBulkStatus("");
+  refreshBulk();
+}
+
+function handleBulkSeparator(separator) {
+  bulk.manualSeparator = separator;
+  ui.setBulkStatus("");
+  refreshBulk();
+}
+
+function handleBulkAdd() {
+  const current = currentPreview();
+  if (!current || current.preview.toAdd.length === 0) return;
+  const { counts, toAdd } = current.preview;
+  const result = addMany(state.concepts, toAdd, current.subject);
+  state.concepts = result.concepts;
+  save("lastSubject", current.subject);
+  persist();
+  ui.clearBulk();
+  refreshNotes();
+  refreshSubjects();
+  refreshBulk();
+  let message = `${result.added}개를 추가했어요.`;
+  if (counts.duplicate + counts.invalid > 0) {
+    message += ` (건너뜀: 중복 ${counts.duplicate}개, 오류 ${counts.invalid}개)`;
+  }
+  ui.setBulkStatus(message);
+}
+
+/* ---------- Quiz ---------- */
+
+// The concepts the quiz uses: the chosen subject, or everything.
+function quizPool() {
+  return filterBySubject(state.concepts, state.quizSubject);
+}
+
+function scopeLabel() {
+  return state.quizSubject === ALL_SUBJECTS ? null : state.quizSubject;
 }
 
 // Back to the quiz start screen (shows the "need 4 concepts" message if blocked).
 function resetQuiz() {
   state.run = freshRun();
+  refreshSubjects();
   ui.renderStats(state.run);
-  ui.showQuizStart();
-  const check = canStartQuiz(state.concepts);
+  const check = canStartQuiz(quizPool(), scopeLabel());
+  ui.showQuizStart(check.ok);
   ui.showQuizMessage(check.ok ? "" : check.message);
-  document.getElementById("start-btn").disabled = !check.ok;
+  ui.setQuizSubjectEnabled(true);
 }
 
 // Runs `action` right away, or after the user confirms when a round is in progress.
@@ -74,7 +175,7 @@ function handleTab(name) {
       resetQuiz();
       state.tab = "notes";
       ui.showTab("notes");
-      refreshNotes(); // show updated "Missed N×" badges
+      refreshNotes(); // show updated "N번 틀림" badges
     });
   } else {
     state.tab = name;
@@ -83,26 +184,36 @@ function handleTab(name) {
   }
 }
 
+function handleQuizSubject(value) {
+  state.quizSubject = value;
+  save("quizSubject", value);
+  resetQuiz();
+}
+
+// Shows the question at run.index of the current part.
 function askNext() {
-  const concept = pickNextConcept(state.concepts, state.missed, Math.random, state.run.lastId);
-  const picked = pickOptions(concept, state.concepts);
+  const { run } = state;
+  const concept = run.queue[run.index];
+  const picked = pickOptions(concept, quizPool());
   if (!picked) {
     resetQuiz();
     return;
   }
-  state.run.current = { concept, ...picked };
-  state.run.lastId = concept.id;
-  const progress = `Question ${state.run.total + 1} of ${state.run.length}`;
-  ui.showQuestion(concept.term, picked.options, handleAnswer, progress);
+  run.current = { concept, ...picked };
+  const label = progressLabel({ phase: run.phase, index: run.index, length: run.queue.length });
+  ui.showQuestion(concept.term, picked.options, handleAnswer, label, run.phase === "retry");
 }
 
 function handleStart() {
-  const check = canStartQuiz(state.concepts);
+  const pool = quizPool();
+  const check = canStartQuiz(pool, scopeLabel());
   ui.showQuizMessage(check.ok ? "" : check.message);
   if (!check.ok) return;
   state.run = freshRun();
   state.run.active = true;
-  state.run.length = roundLength(state.concepts);
+  state.run.round = buildRound(pool, state.missed);
+  state.run.queue = state.run.round;
+  ui.setQuizSubjectEnabled(false);
   ui.renderStats(state.run);
   askNext();
 }
@@ -110,54 +221,83 @@ function handleStart() {
 function handleAnswer(pickedIndex) {
   const { current } = state.run;
   if (!current) return;
+  const { run } = state;
   const correct = pickedIndex === current.correctIndex;
+  const inRetry = run.phase === "retry";
 
-  state.run.combo = nextCombo(state.run.combo, correct);
-  const points = pointsForAnswer(correct, state.run.combo);
-  state.run.score += points;
-  state.run.total += 1;
-  if (correct) state.run.correct += 1;
-  else if (!state.run.missedIds.includes(current.concept.id)) state.run.missedIds.push(current.concept.id);
-  state.missed = recordAnswer(state.missed, current.concept.id, correct);
-  persist();
-  state.run.current = null;
-
-  let message = "Not quite. The correct definition is highlighted.";
-  if (correct) {
-    message = `Correct! +${points} points`;
-    if (state.run.combo >= 2) message += ` (combo x${state.run.combo})`;
+  let message = "아쉬워요. 정답이 초록색으로 표시돼요.";
+  if (inRetry) {
+    // 다시 풀기: review only. No points, no combo, and the saved miss counts stay as they are
+    // (otherwise one correct retry would cancel the miss that the weighting is based on).
+    run.retryTotal += 1;
+    if (correct) {
+      run.retryCorrect += 1;
+      message = "정답! (다시 풀기는 점수가 없어요)";
+    }
+  } else {
+    run.combo = nextCombo(run.combo, correct);
+    const points = pointsForAnswer(correct, run.combo);
+    run.score += points;
+    run.total += 1;
+    if (correct) {
+      run.correct += 1;
+      message = `정답! +${points}점`;
+      if (run.combo >= 2) message += ` (콤보 x${run.combo})`;
+    } else if (!run.missedIds.includes(current.concept.id)) {
+      run.missedIds.push(current.concept.id);
+    }
+    state.missed = recordAnswer(state.missed, current.concept.id, correct);
+    persist();
   }
-  ui.renderStats(state.run);
-  ui.showAnswerResult({
-    pickedIndex,
-    correctIndex: current.correctIndex,
-    message,
-    good: correct,
-    isLast: state.run.total >= state.run.length,
+  run.current = null;
+  run.step = nextStep({
+    phase: run.phase, index: run.index, length: run.queue.length, missedCount: run.missedIds.length,
   });
+
+  const nextLabel = { next: "다음 문제", retry: "틀린 문제 다시 풀기", results: "결과 보기" }[run.step];
+  ui.renderStats(run);
+  ui.showAnswerResult({ pickedIndex, correctIndex: current.correctIndex, message, good: correct, nextLabel });
 }
 
 function showResults() {
-  const { score, correct, total, missedIds } = state.run;
+  const { score, correct, total, missedIds, retryTotal, retryCorrect } = state.run;
   const missedTerms = missedIds
     .map((id) => state.concepts.find((c) => c.id === id))
     .filter(Boolean)
     .map((c) => c.term);
   state.run.active = false;
-  ui.showResult({ score, correct, total, missedTerms });
+  ui.setQuizSubjectEnabled(true);
+  ui.showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect });
 }
 
 function handleNext() {
-  if (state.run.total >= state.run.length) showResults();
-  else askNext();
+  const { run } = state;
+  if (run.step === "next") {
+    run.index += 1;
+    askNext();
+  } else if (run.step === "retry") {
+    run.phase = "retry";
+    run.queue = buildRetry(run.round, run.missedIds);
+    run.index = 0;
+    askNext();
+  } else {
+    showResults();
+  }
 }
 
 ui.bindEvents({
   onTab: handleTab,
   onAdd: handleAdd,
+  onBulkChange: handleBulkChange,
+  onBulkSeparator: handleBulkSeparator,
+  onBulkAdd: handleBulkAdd,
+  onQuizSubject: handleQuizSubject,
   onStart: handleStart,
   onNext: handleNext,
   onEnd: () => leaveQuizThen(resetQuiz),
 });
+ui.setSubjectInput(loadText("lastSubject", ""));
 refreshNotes();
+refreshSubjects();
+refreshBulk();
 resetQuiz();

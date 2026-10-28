@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,41 +9,76 @@
 <body>
   <header class="app-header">
     <h1>Study Quest</h1>
-    <nav class="tabs" aria-label="Sections">
-      <button class="tab is-active" data-tab="notes" type="button">Notes</button>
-      <button class="tab" data-tab="quiz" type="button">Quiz</button>
+    <nav class="tabs" aria-label="메뉴">
+      <button class="tab is-active" data-tab="notes" type="button">노트</button>
+      <button class="tab" data-tab="quiz" type="button">퀴즈</button>
     </nav>
   </header>
 
   <main>
     <section id="tab-notes" class="panel">
       <form id="concept-form" class="card" autocomplete="off">
-        <h2>Add a concept</h2>
-        <label for="term-input">Concept</label>
-        <input id="term-input" type="text" maxlength="80" placeholder="e.g. Inflation">
-        <label for="definition-input">Definition</label>
-        <textarea id="definition-input" rows="3" maxlength="300" placeholder="e.g. A general rise in prices over time"></textarea>
+        <h2>개념 추가</h2>
+        <label for="subject-input">과목</label>
+        <input id="subject-input" type="text" maxlength="30" list="subject-list" placeholder="예: 생명과학 (비워 두면 미분류)">
+        <label for="term-input">개념</label>
+        <input id="term-input" type="text" maxlength="80" placeholder="예: 광합성">
+        <label for="definition-input">정의</label>
+        <textarea id="definition-input" rows="3" maxlength="300" placeholder="예: 식물이 빛 에너지로 양분을 만드는 과정"></textarea>
         <p id="form-error" class="error" role="alert"></p>
-        <button class="btn btn-primary" type="submit">Add concept</button>
+        <button class="btn btn-primary" type="submit">개념 추가</button>
       </form>
+      <datalist id="subject-list"></datalist>
+
+      <details id="bulk" class="card">
+        <summary>여러 개 한 번에 추가</summary>
+        <div class="bulk-body">
+          <p class="hint">한 줄에 개념 하나씩 붙여 넣으세요. 엑셀이나 구글 시트에서 복사해도 돼요.</p>
+
+          <label for="bulk-subject">과목 <span class="hint-inline">(붙여 넣은 개념이 모두 이 과목에 들어가요)</span></label>
+          <input id="bulk-subject" type="text" maxlength="30" list="subject-list" placeholder="예: 한국사 (비워 두면 미분류)" autocomplete="off">
+
+          <label for="bulk-text">붙여 넣기</label>
+          <textarea id="bulk-text" rows="6" placeholder="광합성: 식물이 빛으로 양분을 만드는 과정&#10;리보솜: 단백질을 합성하는 세포 소기관"></textarea>
+
+          <div class="sep-row">
+            <span class="sep-label">구분 기호</span>
+            <button class="sep-btn" data-sep=":" type="button" aria-pressed="true">:</button>
+            <button class="sep-btn" data-sep="/" type="button" aria-pressed="false">/</button>
+            <button class="sep-btn" data-sep="tab" type="button" aria-pressed="false">Tab</button>
+          </div>
+          <p id="sep-hint" class="hint"></p>
+
+          <div id="bulk-preview" hidden>
+            <p id="bulk-summary" class="bulk-summary"></p>
+            <ul id="bulk-items" class="preview-list"></ul>
+          </div>
+
+          <button id="bulk-add-btn" class="btn btn-primary" type="button" disabled>추가하기</button>
+          <p id="bulk-status" class="success" role="status"></p>
+        </div>
+      </details>
 
       <div class="card">
-        <h2>Your concepts <span id="concept-count" class="badge">0</span></h2>
+        <h2>내 개념 <span id="concept-count" class="badge">0</span></h2>
         <ul id="concept-list" class="concept-list"></ul>
       </div>
     </section>
 
     <section id="tab-quiz" class="panel" hidden>
       <div class="card">
+        <label for="quiz-subject" class="first-label">과목</label>
+        <select id="quiz-subject"></select>
+
         <div class="stats">
-          <div><span class="stat-label">Points</span><strong id="stat-score">0</strong></div>
-          <div><span class="stat-label">Combo</span><strong id="stat-combo">0</strong></div>
-          <div><span class="stat-label">Correct</span><strong id="stat-correct">0/0</strong></div>
+          <div><span class="stat-label">점수</span><strong id="stat-score">0</strong></div>
+          <div><span class="stat-label">콤보</span><strong id="stat-combo">0</strong></div>
+          <div><span class="stat-label">정답</span><strong id="stat-correct">0/0</strong></div>
         </div>
         <p id="quiz-message" class="notice" hidden></p>
 
         <div id="quiz-start" class="center">
-          <button id="start-btn" class="btn btn-primary" type="button">Start quiz</button>
+          <button id="start-btn" class="btn btn-primary" type="button">퀴즈 시작</button>
         </div>
 
         <div id="quiz-question" hidden>
@@ -51,28 +86,29 @@
           <h2 id="question-term"></h2>
           <div id="options" class="options"></div>
           <p id="feedback" class="feedback" aria-live="polite"></p>
-          <button id="next-btn" class="btn btn-primary" type="button" hidden>Next question</button>
-          <button id="end-btn" class="btn btn-secondary" type="button">End quiz</button>
+          <button id="next-btn" class="btn btn-primary" type="button" hidden>다음 문제</button>
+          <button id="end-btn" class="btn btn-secondary" type="button">퀴즈 종료</button>
         </div>
 
         <div id="quiz-result" hidden>
-          <h2>Round complete!</h2>
-          <p class="result-line"><strong id="result-score">0</strong> points</p>
+          <h2>라운드 완료!</h2>
+          <p class="result-line"><strong id="result-score">0</strong>점</p>
           <p id="result-correct" class="result-line"></p>
-          <h3>Concepts you missed</h3>
+          <p id="result-retry" class="result-line" hidden></p>
+          <h3>틀린 개념</h3>
           <ul id="result-missed" class="missed-list"></ul>
-          <button id="again-btn" class="btn btn-primary" type="button">Play again</button>
+          <button id="again-btn" class="btn btn-primary" type="button">다시 하기</button>
         </div>
       </div>
     </section>
   </main>
 
   <dialog id="leave-dialog" class="dialog" aria-labelledby="leave-title">
-    <h2 id="leave-title">Leave quiz?</h2>
-    <p>Your progress in this round will be lost.</p>
+    <h2 id="leave-title">퀴즈에서 나갈까요?</h2>
+    <p>이번 라운드의 진행 상황이 사라져요.</p>
     <div class="dialog-actions">
-      <button id="stay-btn" class="btn btn-secondary" type="button">Stay</button>
-      <button id="leave-btn" class="btn btn-primary" type="button">Leave</button>
+      <button id="stay-btn" class="btn btn-secondary" type="button">계속하기</button>
+      <button id="leave-btn" class="btn btn-primary" type="button">나가기</button>
     </div>
   </dialog>
 
