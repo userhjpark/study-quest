@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study Quest</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Study Quest</h1>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab is-active" data-tab="notes" type="button">Notes</button>
+      <button class="tab" data-tab="quiz" type="button">Quiz</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-notes" class="panel">
+      <form id="concept-form" class="card" autocomplete="off">
+        <h2>Add a concept</h2>
+        <label for="term-input">Concept</label>
+        <input id="term-input" type="text" maxlength="80" placeholder="e.g. Inflation">
+        <label for="definition-input">Definition</label>
+        <textarea id="definition-input" rows="3" maxlength="300" placeholder="e.g. A general rise in prices over time"></textarea>
+        <p id="form-error" class="error" role="alert"></p>
+        <button class="btn btn-primary" type="submit">Add concept</button>
+      </form>
+
+      <div class="card">
+        <h2>Your concepts <span id="concept-count" class="badge">0</span></h2>
+        <ul id="concept-list" class="concept-list"></ul>
+      </div>
+    </section>
+
+    <section id="tab-quiz" class="panel" hidden>
+      <div class="card">
+        <div class="stats">
+          <div><span class="stat-label">Points</span><strong id="stat-score">0</strong></div>
+          <div><span class="stat-label">Combo</span><strong id="stat-combo">0</strong></div>
+          <div><span class="stat-label">Correct</span><strong id="stat-correct">0/0</strong></div>
+        </div>
+        <p id="quiz-message" class="notice" hidden></p>
+
+        <div id="quiz-start" class="center">
+          <button id="start-btn" class="btn btn-primary" type="button">Start quiz</button>
+        </div>
+
+        <div id="quiz-question" hidden>
+          <p id="question-progress" class="stat-label"></p>
+          <h2 id="question-term"></h2>
+          <div id="options" class="options"></div>
+          <p id="feedback" class="feedback" aria-live="polite"></p>
+          <button id="next-btn" class="btn btn-primary" type="button" hidden>Next question</button>
+          <button id="end-btn" class="btn btn-secondary" type="button">End quiz</button>
+        </div>
+
+        <div id="quiz-result" hidden>
+          <h2>Round complete!</h2>
+          <p class="result-line"><strong id="result-score">0</strong> points</p>
+          <p id="result-correct" class="result-line"></p>
+          <h3>Concepts you missed</h3>
+          <ul id="result-missed" class="missed-list"></ul>
+          <button id="again-btn" class="btn btn-primary" type="button">Play again</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="leave-dialog" class="dialog" aria-labelledby="leave-title">
+    <h2 id="leave-title">Leave quiz?</h2>
+    <p>Your progress in this round will be lost.</p>
+    <div class="dialog-actions">
+      <button id="stay-btn" class="btn btn-secondary" type="button">Stay</button>
+      <button id="leave-btn" class="btn btn-primary" type="button">Leave</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
