@@ -35,6 +35,12 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Parsing lives in a pure logic file (`js/importer.js`, no DOM) and is tested in `tests/logic.test.js`. The preview accepts plain rows, so other sources (e.g. PDF) can feed it.
 - Sample concepts: two subjects (생명과학, 한국사) with at least 4 concepts each, so subject switching can be demoed.
 
+**Round rules (decision changed Oct 29)**
+- *Old rule (Oct 28):* a concept could appear twice in one round, so missed ones got drawn more often. *Why it was dropped:* in manual testing, a 5-question round over 5 concepts showed only 3 different ones (two repeated, two never asked), so small subjects could not be reviewed fully.
+- *New rule:* in the main part each concept appears at most once. With 10 or fewer concepts, all of them are asked (random order). With more than 10, 10 distinct concepts are drawn, and frequently-missed ones are more likely to be drawn (weighting kept, weight = 1 + misses, capped).
+- *Retry part ("다시 풀기"):* concepts answered wrong in the main part are asked once more at the end, shown clearly in the progress label. The retry gives no points, no combo, and does not change the saved miss counts (otherwise one correct retry would cancel the miss the weighting is based on). Wrong in the retry is not asked a third time.
+- Verification evidence: `tests/logic.test.js` simulates 1000 rounds over 20 concepts and prints how often a missed concept is included vs a never-missed one.
+
 **Stage 2 (core)**
 - Focus timer: 10 / 15 / 25 min, plus 1 min for demos. When it ends, a quiz starts.
 - XP, levels, coins. Daily check-in and streak bonus.
@@ -104,11 +110,13 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Repo: https://github.com/userhjpark/study-quest (public, pushed).
 - Stage 1 built, tested (24 Node tests + manual checklist) and committed: notes, 10-question quiz rounds with result screen, missed-concept weighting and "Missed N×" badge, combo points, in-page leave dialog. A concept may appear twice in one round (kept on purpose so weighting stays meaningful).
 - GitHub Pages is live: https://userhjpark.github.io/study-quest/
-- Approved the Stage 1 extensions above (Korean UI, subjects, bulk import) and the Stage 4 A/B choice. No code for them yet.
+- Approved the Stage 1 extensions above (Korean UI, subjects, bulk import) and the Stage 4 A/B choice.
+
+**Oct 29:**
+- Subjects, `js/importer.js`, and the Korean UI were built and passed the user's manual test (not yet committed at that point).
+- Round rules changed (see "Round rules" above): each concept once per round, plus a "다시 풀기" retry part. Logic and tests done (64 Node tests pass); screens updated; waiting for the user's retest.
 
 **Next (in order):**
-1. Subjects in the logic (`concepts.js`, `quiz.js`) + tests.
-2. `js/importer.js` (parsing, separator detection, preview) + tests.
-3. Korean UI text everywhere, new screens (subject field, quiz subject picker, bulk import section), update `tests/manual-checklist.md`. Tell the user how to clear old site data before testing.
-4. Commit in separate steps, push, then check the live site.
-5. Then Stage 2. Stage 4 decision: Oct 30 evening.
+1. User retests the round change (`tests/manual-checklist.md`, quiz section).
+2. Commit in separate steps (subjects + importer + round logic with tests, then Korean UI and screens), push, then check the live site.
+3. Then Stage 2. Stage 4 decision (PDF import vs leaderboard): Oct 30 evening.
