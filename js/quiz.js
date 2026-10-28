@@ -17,25 +17,27 @@ function distinctDefinitions(concepts) {
 
 // The quiz needs 4 concepts AND 4 different definitions, otherwise we could not
 // build 4 distinct options.
-export function canStartQuiz(concepts) {
+// `concepts` is the pool for the chosen subject. `scopeLabel` is that subject's name
+// (or null for all subjects) and is only used to make the message clearer.
+export function canStartQuiz(concepts, scopeLabel = null) {
+  const where = scopeLabel ? `'${scopeLabel}' 과목에는` : "지금은";
   if (concepts.length < MIN_CONCEPTS) {
     return {
       ok: false,
-      message: `You need at least ${MIN_CONCEPTS} concepts to start a quiz. You have ${concepts.length}.`,
+      message: `퀴즈를 시작하려면 개념이 최소 ${MIN_CONCEPTS}개 필요해요. ${where} ${concepts.length}개예요.`,
     };
   }
   if (distinctDefinitions(concepts).size < OPTION_COUNT) {
     return {
       ok: false,
-      message: `You need at least ${OPTION_COUNT} concepts with different definitions to start a quiz.`,
+      message: `퀴즈를 시작하려면 서로 다른 정의를 가진 개념이 최소 ${OPTION_COUNT}개 필요해요.`,
     };
   }
   return { ok: true, message: "" };
 }
 
-// One round is 10 questions, or fewer when there are fewer than 10 concepts.
-// Concepts may repeat inside a round (missed ones more often), so this is a cap
-// by concept count, not a "each concept once" rule.
+// The main part of a round has 10 questions, or fewer when there are fewer than 10
+// concepts (each concept is asked at most once, see buildRound).
 export function roundLength(concepts) {
   return Math.min(ROUND_LENGTH, concepts.length);
 }
@@ -73,17 +75,49 @@ export function weightOf(missed, id) {
   return 1 + Math.min(missed[id] || 0, MAX_MISS_WEIGHT);
 }
 
-// Weighted random pick. Avoids repeating the previous concept when possible.
-export function pickNextConcept(concepts, missed, rng = Math.random, lastId = null) {
-  let pool = concepts;
-  if (concepts.length > 1) pool = concepts.filter((c) => c.id !== lastId);
-  const total = pool.reduce((sum, c) => sum + weightOf(missed, c.id), 0);
-  let roll = rng() * total;
-  for (const c of pool) {
-    roll -= weightOf(missed, c.id);
-    if (roll < 0) return c;
+// Picks `count` DISTINCT items by weighted random draw (a drawn item is removed from the pool).
+function sampleDistinct(items, count, weightFn, rng) {
+  const pool = [...items];
+  const picked = [];
+  while (picked.length < count && pool.length > 0) {
+    const total = pool.reduce((sum, item) => sum + weightFn(item), 0);
+    let roll = rng() * total;
+    let index = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) {
+      roll -= weightFn(pool[i]);
+      if (roll < 0) { index = i; break; }
+    }
+    picked.push(pool.splice(index, 1)[0]);
   }
-  return pool[pool.length - 1];
+  return picked;
+}
+
+// The main part of a round: each concept at most once.
+//  - 10 concepts or fewer: all of them, in random order.
+//  - more than 10: 10 distinct ones; frequently-missed concepts are more likely to be chosen.
+export function buildRound(concepts, missed, rng = Math.random) {
+  const chosen = sampleDistinct(concepts, roundLength(concepts), (c) => weightOf(missed, c.id), rng);
+  return shuffle(chosen, rng);
+}
+
+// "다시 풀기" part: the concepts answered wrong in the main part, once more, in the order they were asked.
+export function buildRetry(round, missedIds) {
+  const wrong = new Set(missedIds);
+  return round.filter((c) => wrong.has(c.id));
+}
+
+// What comes after the current question: another question of this part, the retry part, or the results.
+//   phase: "main" | "retry"; index: 0-based position; length: questions in this part;
+//   missedCount: concepts answered wrong so far in the main part (including the current answer).
+export function nextStep({ phase, index, length, missedCount }) {
+  if (index + 1 < length) return "next";
+  if (phase === "main" && missedCount > 0) return "retry";
+  return "results";
+}
+
+export function progressLabel({ phase, index, length }) {
+  const position = `${index + 1} / ${length}`;
+  return phase === "retry" ? `다시 풀기 ${position} · 이 개념의 정의는?` : `${position} · 이 개념의 정의는?`;
 }
 
 // A wrong answer raises the miss count; a correct answer lowers it until it is gone.
