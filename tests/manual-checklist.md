@@ -17,6 +17,21 @@ The UI is in Korean.
 - [ ] Delete a concept: it disappears and the counter goes down.
 - [ ] Reload the page: your added and deleted concepts are still as you left them.
 
+## Stage 1: Notes list: filter and groups
+
+- [ ] Above the list there are buttons "전체 10", "생명과학 5", "한국사 5"; "전체" is highlighted.
+- [ ] In 전체 the list is grouped: a header "생명과학 (5)" with its 5 concepts, then "한국사 (5)".
+- [ ] Tap a group header: the group collapses (arrow ▸) and the other group stays open; tap again to expand (▾).
+- [ ] Each concept still shows its subject tag and, after wrong quiz answers, its "N번 틀림" badge.
+- [ ] Tap "한국사 5": only the 5 한국사 concepts are shown, without a group header. Tap "전체" to go back.
+- [ ] Reload the page: the chosen filter and the collapsed groups are remembered.
+- [ ] Add a concept to a subject while a different subject is selected: the filter switches to the subject you added to, so the new concept is visible.
+- [ ] Add a concept to a collapsed group in 전체: that group opens.
+- [ ] Add a concept with a new subject: a new button appears, and the list shows it as a new group.
+- [ ] **Edge case:** select "한국사", delete all its concepts: the filter falls back to 전체 and the "한국사" button disappears.
+- [ ] Bulk import into a subject also shows the new concepts (same rules as above).
+- [ ] **Phone:** with 4+ subjects the buttons wrap onto several rows (no sideways scrolling); headers and buttons are easy to tap; long subject names wrap.
+
 ## Stage 1: Bulk import (여러 개 한 번에 추가)
 
 - [ ] The section is collapsed by default; single-entry users see only its title. Tapping it opens it.

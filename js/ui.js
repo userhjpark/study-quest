@@ -60,54 +60,104 @@ export function showTab(name) {
 
 /* ---------- Notes ---------- */
 
-export function renderConcepts(concepts, missed, onDelete) {
-  const list = $("concept-list");
-  list.replaceChildren();
-  $("concept-count").textContent = String(concepts.length);
+function createConceptItem(c, missed, onDelete) {
+  const li = document.createElement("li");
+  li.className = "concept-item";
 
-  if (concepts.length === 0) {
-    const li = document.createElement("li");
-    li.className = "empty";
-    li.textContent = "아직 개념이 없어요. 위에서 첫 개념을 추가해 보세요.";
-    list.append(li);
+  const text = document.createElement("div");
+  text.className = "concept-text";
+  const term = document.createElement("div");
+  term.className = "concept-term";
+  term.textContent = c.term;
+  const def = document.createElement("div");
+  def.className = "concept-def";
+  def.textContent = c.definition;
+  text.append(term, def);
+
+  const tag = document.createElement("span");
+  tag.className = "subject-tag";
+  tag.textContent = c.subject;
+  text.append(tag);
+
+  if (missed[c.id] > 0) {
+    const badge = document.createElement("span");
+    badge.className = "missed-badge";
+    badge.textContent = `${missed[c.id]}번 틀림`;
+    text.append(badge);
+  }
+
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "delete-btn";
+  del.textContent = "삭제";
+  del.setAttribute("aria-label", `${c.term} 삭제`);
+  del.addEventListener("click", () => onDelete(c.id));
+
+  li.append(text, del);
+  return li;
+}
+
+// Filter buttons above the list: "전체" + one per subject. `subjects` is [{ name, count }].
+export function renderSubjectFilter(subjects, total, selected, allValue, onSelect) {
+  const box = $("subject-filter");
+  box.replaceChildren();
+  const add = (value, label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.textContent = label;
+    btn.setAttribute("aria-pressed", String(value === selected));
+    btn.addEventListener("click", () => onSelect(value));
+    box.append(btn);
+  };
+  add(allValue, `전체 ${total}`);
+  for (const s of subjects) add(s.name, `${s.name} ${s.count}`);
+}
+
+// groups: [{ name, concepts }]. With showHeaders (the "전체" view) each group gets a header
+// "과목 (개수)" that collapses or expands it; `collapsed` is the set of collapsed subject names.
+export function renderConcepts({ groups, total, showHeaders, collapsed, missed, onDelete, onToggle }) {
+  $("concept-count").textContent = String(total);
+  const box = $("concept-groups");
+  box.replaceChildren();
+
+  if (total === 0) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "아직 개념이 없어요. 위에서 첫 개념을 추가해 보세요.";
+    box.append(p);
     return;
   }
 
-  for (const c of concepts) {
-    const li = document.createElement("li");
-    li.className = "concept-item";
+  for (const group of groups) {
+    const section = document.createElement("div");
+    section.className = "group";
+    const isCollapsed = showHeaders && collapsed.has(group.name);
 
-    const text = document.createElement("div");
-    text.className = "concept-text";
-    const term = document.createElement("div");
-    term.className = "concept-term";
-    term.textContent = c.term;
-    const def = document.createElement("div");
-    def.className = "concept-def";
-    def.textContent = c.definition;
-    text.append(term, def);
-
-    const tag = document.createElement("span");
-    tag.className = "subject-tag";
-    tag.textContent = c.subject;
-    text.append(tag);
-
-    if (missed[c.id] > 0) {
-      const badge = document.createElement("span");
-      badge.className = "missed-badge";
-      badge.textContent = `${missed[c.id]}번 틀림`;
-      text.append(badge);
+    if (showHeaders) {
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "group-header";
+      head.setAttribute("aria-expanded", String(!isCollapsed));
+      const arrow = document.createElement("span");
+      arrow.className = "group-arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      arrow.textContent = isCollapsed ? "▸" : "▾";
+      const title = document.createElement("span");
+      title.className = "group-title";
+      title.textContent = `${group.name} (${group.concepts.length})`;
+      head.append(arrow, title);
+      head.addEventListener("click", () => onToggle(group.name));
+      section.append(head);
     }
 
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "delete-btn";
-    del.textContent = "삭제";
-    del.setAttribute("aria-label", `${c.term} 삭제`);
-    del.addEventListener("click", () => onDelete(c.id));
-
-    li.append(text, del);
-    list.append(li);
+    if (!isCollapsed) {
+      const list = document.createElement("ul");
+      list.className = "concept-list";
+      for (const c of group.concepts) list.append(createConceptItem(c, missed, onDelete));
+      section.append(list);
+    }
+    box.append(section);
   }
 }
 

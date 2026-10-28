@@ -3,7 +3,7 @@
 import { load, save } from "./storage.js";
 import {
   SAMPLE_CONCEPTS, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
-  listSubjects, filterBySubject,
+  listSubjects, filterBySubject, normalizeFilter, visibleGroups,
 } from "./concepts.js";
 import {
   canStartQuiz, pickOptions, recordAnswer, nextCombo, pointsForAnswer,
@@ -32,11 +32,18 @@ function loadText(key, fallback) {
   return typeof value === "string" ? value : fallback;
 }
 
+function loadCollapsed() {
+  const saved = load("collapsedSubjects", []);
+  return new Set(Array.isArray(saved) ? saved.filter((s) => typeof s === "string") : []);
+}
+
 const state = {
   tab: "notes",
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
   missed: load("missed", {}),
   quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
+  notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
+  collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
   run: freshRun(),
 };
 
@@ -50,16 +57,59 @@ function persist() {
 
 /* ---------- Notes ---------- */
 
+// Filter buttons + the list (grouped by subject in the "전체" view). A saved filter whose
+// subject no longer exists falls back to "전체".
 function refreshNotes() {
-  ui.renderConcepts(state.concepts, state.missed, handleDelete);
+  const filter = normalizeFilter(state.concepts, state.notesFilter);
+  if (filter !== state.notesFilter) {
+    state.notesFilter = filter;
+    save("notesFilter", filter);
+  }
+  ui.renderSubjectFilter(
+    listSubjects(state.concepts), state.concepts.length, filter, ALL_SUBJECTS, handleNotesFilter
+  );
+  ui.renderConcepts({
+    groups: visibleGroups(state.concepts, filter),
+    total: state.concepts.length,
+    showHeaders: filter === ALL_SUBJECTS,
+    collapsed: state.collapsed,
+    missed: state.missed,
+    onDelete: handleDelete,
+    onToggle: handleToggleGroup,
+  });
+}
+
+function handleNotesFilter(value) {
+  state.notesFilter = value;
+  save("notesFilter", value);
+  refreshNotes();
+}
+
+function handleToggleGroup(name) {
+  if (state.collapsed.has(name)) state.collapsed.delete(name);
+  else state.collapsed.add(name);
+  save("collapsedSubjects", [...state.collapsed]);
+  refreshNotes();
+}
+
+// After adding to a subject, make sure the new concepts are visible: expand its group, and
+// if the list is filtered to a different subject, switch the filter to the one just used.
+function revealSubject(name) {
+  state.collapsed.delete(name);
+  save("collapsedSubjects", [...state.collapsed]);
+  if (state.notesFilter !== ALL_SUBJECTS && state.notesFilter !== name) {
+    state.notesFilter = name;
+    save("notesFilter", name);
+  }
 }
 
 // Subject suggestions + the quiz subject picker. Falls back to "all" if the chosen subject is gone.
 function refreshSubjects() {
   const subjects = listSubjects(state.concepts);
-  if (state.quizSubject !== ALL_SUBJECTS && !subjects.some((s) => s.name === state.quizSubject)) {
-    state.quizSubject = ALL_SUBJECTS;
-    save("quizSubject", state.quizSubject);
+  const quizSubject = normalizeFilter(state.concepts, state.quizSubject);
+  if (quizSubject !== state.quizSubject) {
+    state.quizSubject = quizSubject;
+    save("quizSubject", quizSubject);
   }
   ui.renderSubjectSuggestions(subjects);
   ui.renderQuizSubjects(subjects, state.concepts.length, state.quizSubject, ALL_SUBJECTS);
@@ -72,6 +122,7 @@ function handleAdd(term, definition, subject) {
   state.concepts = result.concepts;
   save("lastSubject", subject);
   persist();
+  revealSubject(state.concepts[state.concepts.length - 1].subject);
   ui.clearForm();
   refreshNotes();
   refreshSubjects();
@@ -129,6 +180,7 @@ function handleBulkAdd() {
   state.concepts = result.concepts;
   save("lastSubject", current.subject);
   persist();
+  revealSubject(state.concepts[state.concepts.length - 1].subject);
   ui.clearBulk();
   refreshNotes();
   refreshSubjects();

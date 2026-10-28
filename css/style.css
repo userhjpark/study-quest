@@ -189,6 +189,42 @@ input:focus, textarea:focus { outline: none; border-color: var(--primary); }
 .dialog p { margin: 0; }
 .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+/* Notes: subject filter chips and collapsible groups (wrap on narrow phones) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip {
+  min-height: var(--tap);
+  padding: 0 16px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.chip[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+.group { margin-bottom: 8px; }
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--primary-dark);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.group-arrow { flex: none; width: 1em; }
+.group-title { min-width: 0; overflow-wrap: anywhere; }
+
 /* Subject tag, select */
 .subject-tag {
   display: inline-block;

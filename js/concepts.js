@@ -119,3 +119,25 @@ export function filterBySubject(concepts, subject) {
   if (subject === ALL_SUBJECTS) return concepts;
   return concepts.filter((c) => c.subject === subject);
 }
+
+// Subject names that exist, plus "all". Used for saved filter choices: if the saved
+// subject no longer exists (all its concepts were deleted) fall back to "all".
+export function normalizeFilter(concepts, value) {
+  if (value === ALL_SUBJECTS) return ALL_SUBJECTS;
+  return concepts.some((c) => c.subject === value) ? value : ALL_SUBJECTS;
+}
+
+// [{ name, concepts }] sorted by subject name, concepts in the order they were added.
+export function groupBySubject(concepts) {
+  return listSubjects(concepts).map((s) => ({
+    name: s.name,
+    concepts: concepts.filter((c) => c.subject === s.name),
+  }));
+}
+
+// What the Notes list shows: every subject as a group for "all", or just one group.
+export function visibleGroups(concepts, filter) {
+  const groups = groupBySubject(concepts);
+  if (filter === ALL_SUBJECTS) return groups;
+  return groups.filter((g) => g.name === filter);
+}

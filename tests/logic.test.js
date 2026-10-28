@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   SAMPLE_CONCEPTS, DEFAULT_SUBJECT, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
   listSubjects, filterBySubject, resolveSubject, isDuplicate,
+  normalizeFilter, groupBySubject, visibleGroups,
 } from "../js/concepts.js";
 import { detectSeparator, parseLines, buildPreview, MAX_IMPORT } from "../js/importer.js";
 import {
@@ -115,6 +116,29 @@ test("addMany adds rows to one subject and skips duplicates", () => {
   assert.equal(r.added, 2);
   assert.equal(r.concepts.length, 3);
   assert.equal(new Set(r.concepts.map((c) => c.id)).size, 3);
+});
+test("groupBySubject: groups sorted by name, concepts keep their order, counts match", () => {
+  const list = [mkIn("1", "a", "B"), mkIn("2", "b", "A"), mkIn("3", "c", "B")];
+  const groups = groupBySubject(list);
+  assert.deepEqual(groups.map((g) => g.name), ["A", "B"]);
+  assert.deepEqual(groups[1].concepts.map((c) => c.id), ["1", "3"]);
+  assert.equal(groups.reduce((n, g) => n + g.concepts.length, 0), list.length);
+  assert.deepEqual(groupBySubject([]), []);
+});
+test("visibleGroups: all subjects as groups for 전체, a single group for one subject", () => {
+  const list = [mkIn("1", "a", "A"), mkIn("2", "b", "B"), mkIn("3", "c", "A")];
+  assert.equal(visibleGroups(list, ALL_SUBJECTS).length, 2);
+  const only = visibleGroups(list, "A");
+  assert.equal(only.length, 1);
+  assert.deepEqual(only[0].concepts.map((c) => c.id), ["1", "3"]);
+  assert.deepEqual(visibleGroups(list, "nope"), []);
+});
+test("EDGE CASE: a saved filter whose subject no longer exists falls back to 전체", () => {
+  const list = [mkIn("1", "a", "A")];
+  assert.equal(normalizeFilter(list, "A"), "A");
+  assert.equal(normalizeFilter(list, "Deleted subject"), ALL_SUBJECTS);
+  assert.equal(normalizeFilter(list, ALL_SUBJECTS), ALL_SUBJECTS);
+  assert.equal(normalizeFilter([], "A"), ALL_SUBJECTS);
 });
 test("EDGE CASE: a subject with fewer than 4 concepts blocks the quiz, another subject still works", () => {
   const list = [
