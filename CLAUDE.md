@@ -46,6 +46,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - XP, levels, coins. Daily check-in and streak bonus.
 - XP and coins come mainly from correct quiz answers. Finishing the timer gives only a small bonus, so leaving the timer running cannot be farmed for XP.
 - Daily XP cap (limits leaderboard cheating).
+- **"최근 기록" section** under the Quiz tab (planned Oct 29, not built yet): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
 
 **Stage 3 (core)**
 - Character customization: buy and equip colors, hats, face items with coins.
@@ -113,10 +114,15 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Approved the Stage 1 extensions above (Korean UI, subjects, bulk import) and the Stage 4 A/B choice.
 
 **Oct 29:**
-- Subjects, `js/importer.js`, and the Korean UI were built and passed the user's manual test (not yet committed at that point).
-- Round rules changed (see "Round rules" above): each concept once per round, plus a "다시 풀기" retry part. Logic and tests done (64 Node tests pass); screens updated; waiting for the user's retest.
+- Subjects, `js/importer.js`, the Korean UI, and the new round rules (each concept once + "다시 풀기" retry) passed the user's manual tests. Committed and pushed in three commits (up to `86458e7`).
+- Notes tab change passed the user's retest (including phone size in DevTools), committed and pushed (`ca7c7f2`): subject filter buttons (전체 + one per subject, choice remembered), "전체" view grouped by subject with collapsible headers "과목 (개수)" (collapsed state remembered), subject tag and "N번 틀림" badge kept. Pure helpers `groupBySubject`, `visibleGroups`, `normalizeFilter` in `concepts.js`.
+- Added the "최근 기록" plan to Stage 2 (see above).
+
+**Stage 1 is complete** (including subjects, bulk import, Korean UI, round rules with retry, Notes filter/groups). 67 Node tests pass (`node tests/logic.test.js`); manual checklist passed by the user. Live site: https://userhjpark.github.io/study-quest/ (the Pages build of the latest push should be re-checked on a phone).
+
+**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
 **Next (in order):**
-1. User retests the round change (`tests/manual-checklist.md`, quiz section).
-2. Commit in separate steps (subjects + importer + round logic with tests, then Korean UI and screens), push, then check the live site.
-3. Then Stage 2. Stage 4 decision (PDF import vs leaderboard): Oct 30 evening.
+1. **Oct 30:** start Stage 2. Per "How we work": show the file structure and a step-by-step plan first (`timer.js`, `rewards.js`, round-result record + "최근 기록", UI changes), wait for approval, then build one step at a time. Remember: XP/coins mainly from correct quiz answers, timer finish only a small bonus; timestamp-based timer; daily XP cap; daily check-in + streak.
+2. **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
+3. Stage 3 (character shop), then README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
