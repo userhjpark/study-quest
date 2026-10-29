@@ -48,6 +48,9 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Daily XP cap (limits leaderboard cheating).
 - **Approved numbers (Oct 29)**: XP per round = main-part score (10 per correct + combo bonus); coins = 1 per correct answer + 5 for a perfect round; daily XP cap **600** (a perfect round with combos is almost 200 XP, so 300 would block after 2 rounds); timer bonus 5 XP + 2 coins per finished timer, at most 3 per day, nothing if quit early; level L needs 50*L*(L-1) total XP; check-in 10 XP + 5 coins + 1 coin per streak day (max +7), check-in XP is outside the cap; **finishing a quiz round or a focus timer also does today's check-in automatically** (bonus only once per day, whichever way it happens; shown on the result screen); the profile bar also shows "오늘 N/600 XP"; a missed day resets the streak to 1.
 - **Timer UI**: separate "집중" tab. When the timer ends, show a "집중 완료!" screen with the bonus and a "퀴즈 시작" button (no automatic quiz start); one tap starts a round in the selected subject, with the usual "need 4 concepts" message if needed.
+- **Pause on "그만하기" (decision Oct 29, after the step 5 test):** tapping "그만하기" pauses the timer (the remaining time is saved) and opens the in-page dialog "집중을 그만할까요?". "계속하기" (or Esc) resumes from the remaining time with a NEW end time counted from now; "그만하기" in the dialog ends the timer with no bonus. *Why:* with a running timer, the time kept going down while the dialog was open, so "계속하기" lost time. A paused timer stores `pausedMs` instead of an end time, so it can never finish and a reload keeps it paused ("일시정지됨" with 계속하기 / 그만하기; the "그만하기" there asks again). The logic is in `timer.js` (`pauseTimer`, `resumeTimer`, `isPaused`) with tests.
+- **Tab order and default tab (decision Oct 29):** tabs are **집중 · 노트 · 퀴즈** and the page opens on **집중**. *Why:* the study flow is focus and study, review the notes, then test yourself with a quiz. Also, after a reload during a timer the app used to open on 노트 and the running timer looked like it had disappeared; opening on 집중 shows it.
+- **"내 개념을 추가해보세요" hint (decision Oct 29):** while the user has no concepts of their own (only the built-in samples, ids `s1`-`s10`; computed by `hasOwnConcepts` in `concepts.js`, so it comes back if they delete their own again), the 집중 start screen and the 퀴즈 start screen show a small box with a "노트 열기" button. *Why:* the app now opens on 집중, so a new user would never see the Notes tab and would only practice with the samples.
 - Stage 3 shop prices: set so the first item is affordable after 2-3 rounds.
 - **"최근 기록" section** under the Quiz tab (built Oct 29): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
 
@@ -129,17 +132,18 @@ All code must be written from scratch in this repo. No templates, no reused code
 **Stage 2 is complete (Oct 29).** Built in six steps, each committed; steps 4 and 5 (UI) passed the user's manual tests:
 - `js/history.js`: round-result record + "최근 기록" (newest 10).
 - `js/rewards.js`: XP, levels (50*L*(L-1)), coins, daily XP cap 600, timer bonus (5 XP + 2 coins, max 3/day), daily check-in + streak, automatic check-in when a round or timer finishes (once per day in either order).
-- `js/timer.js`: timestamp-based focus timer (1/10/15/25 min); "집중" tab with a "집중 완료!" screen and a "퀴즈 시작" button; the page title and a dot on the tab show the state; "그만하기" asks for confirmation in an in-page dialog.
+- `js/timer.js`: timestamp-based focus timer (1/10/15/25 min) with pause/resume; "집중" tab with a "집중 완료!" screen and a "퀴즈 시작" button; the page title and a dot on the tab show the state; "그만하기" pauses the timer and asks for confirmation in an in-page dialog (see the Pause decision above).
 - Header profile bar: level, XP bar, coins, streak, "오늘 N/600 XP", check-in button.
 - Leaving a running quiz round for either 노트 or 집중 shows the in-page leave dialog.
-- Tests: 119 Node tests pass (`node tests/logic.test.js`); manual checklist has a Stage 2 section. The "그만하기" confirm dialog was added right before the commit and has not been clicked through in a browser yet (retest it first thing next session).
+- Tests: 131 Node tests pass (`node tests/logic.test.js`); manual checklist has a Stage 2 section and a section for the new-user hint.
+- **After the Stage 2 commit (Oct 29):** pause-on-quit, the tab order 집중 · 노트 · 퀴즈 with 집중 as the default, and the "내 개념을 추가해보세요" hint were added (see the decisions above). Waiting for the user's retest before pushing.
 - New known limitations were added above (two tabs, XP only given when a round ends, coins not capped). Also: no sound or notification when the timer ends.
 
-Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 2 commits are not pushed yet).
+Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 2 commits are NOT pushed yet).
 
 **Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
 **Next (in order):**
-1. Push the Stage 2 commits and re-check the Pages build.
+1. After the user's retest of the pause dialog, tab order and hint: push the Stage 2 commits and re-check the Pages build.
 2. **Oct 30:** Stage 3 (character shop: `character.js`; buy and equip colors, hats, face items with coins; set prices so the first item is affordable after 2-3 rounds, i.e. about 25-40 coins; plan and wait for approval first). **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
 3. After Stage 3: README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.

@@ -355,3 +355,12 @@ details.card summary {
 /* A dot on the tab when a finished timer is waiting */
 .tab.has-alert::after { content: " ●"; color: #ffd95a; }
 .tab.is-active.has-alert::after { color: var(--primary); }
+
+/* Paused timer */
+.is-paused .focus-time { opacity: 0.55; }
+.is-paused .focus-bar .xp-fill { background: var(--muted); }
+
+/* "Add your own concepts" hint (only samples so far) */
+.own-hint { margin-top: 16px; padding: 12px 16px; border: 2px dashed var(--border); border-radius: 12px; text-align: center; }
+.own-hint p { margin: 0 0 4px; }
+.own-hint .btn { margin-top: 8px; }

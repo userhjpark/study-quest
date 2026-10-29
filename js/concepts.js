@@ -20,6 +20,14 @@ export const SAMPLE_CONCEPTS = [
   { id: "s10", subject: "한국사", term: "거북선", definition: "이순신 장군이 임진왜란 때 활용한, 덮개를 씌운 조선 수군의 전투선" },
 ];
 
+const SAMPLE_IDS = new Set(SAMPLE_CONCEPTS.map((c) => c.id));
+
+// True once at least one concept is not one of the built-in samples. Used for the
+// "내 개념을 추가해보세요" hint: it shows while only samples (or nothing) are left.
+export function hasOwnConcepts(concepts) {
+  return concepts.some((c) => !SAMPLE_IDS.has(c.id));
+}
+
 // Lower-cased, trimmed text used to compare terms and subjects ("DNA" equals "dna ").
 export function keyOf(text) {
   return String(text).trim().toLowerCase();

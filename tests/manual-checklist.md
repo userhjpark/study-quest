@@ -3,7 +3,7 @@
 Run the site locally: in the repo folder run `python3 -m http.server 8000`, then open http://localhost:8000.
 Start from clean data: open a private/incognito window, or clear site data
 (DevTools F12 > Application > Storage > "Clear site data").
-The UI is in Korean.
+The UI is in Korean. The page opens on the 집중 tab; for the Stage 1 items below open the 노트 tab first.
 
 ## Stage 1: Notes (노트)
 
@@ -100,7 +100,9 @@ Use clean data for the first items (private window or "Clear site data").
 
 Use the 1-minute option ("1분 (데모)") for most of these. Reload with Ctrl+Shift+R first.
 
-- [ ] There are three tabs: 노트, 집중, 퀴즈. All fit on a phone-width screen.
+- [ ] The tabs are in this order: 집중, 노트, 퀴즈 (focus, review the notes, then quiz). All fit on a phone-width screen.
+- [ ] **Default tab:** a fresh page load (and a reload) opens on 집중, not on 노트.
+- [ ] **Reload during a timer:** start a timer, reload: the app opens on 집중 and the countdown is visible and correct.
 - [ ] The 집중 tab shows four buttons: 1분 (데모), 10분, 15분, 25분.
 - [ ] Tap "1분 (데모)": the timer starts at once and counts down (01:00, 00:59, ...), the bar fills, and the browser tab title shows the time too.
 - [ ] Switch to 노트 and back to 집중: the time is still correct (the timer was not reset).
@@ -112,15 +114,28 @@ Use the 1-minute option ("1분 (데모)") for most of these. Reload with Ctrl+Sh
 - [ ] **퀴즈 시작:** one tap goes to the 퀴즈 tab and a round starts in the subject shown on the finish screen ("퀴즈 과목: …").
 - [ ] **Edge case:** choose a subject with fewer than 4 concepts in the 퀴즈 tab, finish a timer, tap "퀴즈 시작": you land on the 퀴즈 tab with the red "need 4 concepts" message and no round starts.
 - [ ] "타이머로 돌아가기" returns to the four buttons without starting a quiz.
-- [ ] **그만하기 (보너스 없음):** while running, tap it: an in-page dialog "집중을 그만할까요?" appears (not the browser's own popup).
-  - [ ] "계속하기" (or Esc) closes it and the timer keeps running.
-  - [ ] "그만하기" goes back to the four buttons, XP and coins unchanged, nothing saved (a reload shows no timer).
-  - [ ] **Edge case:** with a 1-minute timer, open the dialog and wait for the end without answering: the dialog closes by itself and the "집중 완료!" screen shows with the bonus (the timer was not cancelled).
+- [ ] **그만하기 pauses the timer:** while running, tap "그만하기 (보너스 없음)". The in-page dialog "집중을 그만할까요?" appears (not the browser's own popup). Behind it the screen says "일시정지됨" and the time stops. Wait about 10 seconds with the dialog open.
+  - [ ] "계속하기" (or Esc) closes the dialog and the timer continues from the time it showed when paused (the 10 seconds were not lost).
+  - [ ] "그만하기" in the dialog goes back to the four buttons, XP and coins unchanged, nothing saved (a reload shows no timer).
+- [ ] **Paused state:** pause (open the dialog), then reload the page while it is open. The dialog is gone, but the 집중 tab shows "일시정지됨" with the same remaining time, and two buttons "계속하기" and "그만하기" (no countdown, the page title says "일시정지"). Wait a while: the time does not change.
+  - [ ] "계속하기" continues from the same remaining time.
+  - [ ] "그만하기" asks "집중을 그만할까요?" again; "계속하기" there resumes, "그만하기" ends the timer.
+- [ ] **Edge case:** a paused 1-minute timer never finishes: leave it paused for over a minute, no "집중 완료!" appears and no bonus is given.
+- [ ] While paused, switching to 노트 and back keeps it paused with the same time.
 - [ ] **Daily limit:** finish four timers on the same day: the first three give +5 XP, +2 코인; the fourth says the day's timer bonus is used up and gives nothing.
 - [ ] **Not farmable:** leaving a timer running forever gives nothing; only finishing it gives the small bonus, at most 3 times a day.
 - [ ] **Leave dialog:** during a quiz round, tap the 집중 tab: the "퀴즈에서 나갈까요?" dialog appears (like for 노트). "계속하기" stays in the round.
 - [ ] The "오늘 N/600 XP" line in the header includes the timer's 5 XP.
 - [ ] Known limitation: no sound or notification when the timer ends; the page only shows the dot and the title. A phone may pause the page in the background, but the remaining time is right as soon as you return.
+
+## Hint for new users ("내 개념을 추가해보세요")
+
+- [ ] With clean data (only the 10 samples): the 집중 tab (start screen, below the time buttons) and the 퀴즈 tab (start screen, above the start button) each show a dashed box "내 개념을 추가해보세요 / 지금은 예시 개념만 있어요." with a "노트 열기" button.
+- [ ] "노트 열기" opens the 노트 tab from both tabs.
+- [ ] The box is not shown while a timer runs, on the "집중 완료!" screen, during a quiz round or on the quiz result screen.
+- [ ] Add one concept of your own in 노트: the box disappears on both tabs (also after a reload).
+- [ ] Delete your own concept again (only samples left): the box comes back.
+- [ ] Bulk import counts as adding your own concepts (box disappears).
 
 ## Phone
 

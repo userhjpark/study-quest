@@ -3,7 +3,7 @@
 import { load, save } from "./storage.js";
 import {
   SAMPLE_CONCEPTS, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
-  listSubjects, filterBySubject, normalizeFilter, visibleGroups,
+  listSubjects, filterBySubject, normalizeFilter, visibleGroups, hasOwnConcepts,
 } from "./concepts.js";
 import {
   canStartQuiz, pickOptions, recordAnswer, nextCombo, pointsForAnswer,
@@ -13,7 +13,9 @@ import {
   DAILY_XP_CAP, sanitizeProfile, levelForXp, levelProgress, currentStreak, canCheckIn, applyCheckIn,
   applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday,
 } from "./rewards.js";
-import { startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer } from "./timer.js";
+import {
+  startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer,
+} from "./timer.js";
 import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import * as ui from "./ui.js";
@@ -57,7 +59,7 @@ function loadCollapsed() {
 }
 
 const state = {
-  tab: "notes",
+  tab: "focus", // the page opens on the timer (also shows a timer that was running before a reload)
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
   missed: load("missed", {}),
   history: sanitizeHistory(load("history", [])), // newest 10 round records
@@ -133,6 +135,7 @@ function refreshSubjects() {
     state.quizSubject = quizSubject;
     save("quizSubject", quizSubject);
   }
+  ui.setOwnConceptsHint(!hasOwnConcepts(state.concepts)); // refreshed whenever concepts change
   ui.renderSubjectSuggestions(subjects);
   ui.renderQuizSubjects(subjects, state.concepts.length, state.quizSubject, ALL_SUBJECTS);
 }
@@ -287,7 +290,7 @@ function refreshFocus() {
 function showTimerNow() {
   const { timer } = state.focus;
   const now = Date.now();
-  ui.renderTimer(formatRemaining(remainingMs(timer, now)), progress(timer, now));
+  ui.renderTimer(formatRemaining(remainingMs(timer, now)), progress(timer, now), isPaused(timer));
 }
 
 function stopTicking() {
@@ -317,15 +320,39 @@ function handleFocusStart(minutes) {
   startTicking();
 }
 
-// "그만하기" asks first, so a stray tap cannot throw away a long session.
-function handleFocusCancel() {
-  if (state.focus.phase !== "running") return;
-  ui.askQuitFocus(quitFocus);
+// Stores a changed timer. A paused timer needs no ticking (its time is frozen).
+function setTimer(timer) {
+  state.focus.timer = timer;
+  save("timer", timer);
+  if (isPaused(timer)) stopTicking();
+  else startTicking();
+  refreshFocus();
 }
 
-// Giving up: no bonus.
+// "그만하기" pauses the timer and asks first, so a stray tap cannot throw away a long session
+// and no time runs off while the question is open. Also used by the "그만하기" button of an
+// already paused timer (e.g. after a reload).
+function handleFocusCancel() {
+  const { focus } = state;
+  if (focus.phase !== "running") return;
+  if (isFinished(focus.timer, Date.now())) { // it ran out just now: no point in asking
+    finishTimer();
+    return;
+  }
+  if (!isPaused(focus.timer)) setTimer(pauseTimer(focus.timer, Date.now()));
+  ui.askQuitFocus({ onQuit: quitFocus, onKeep: handleFocusResume });
+}
+
+// Continues from the time that was left: the new end time is counted from now.
+function handleFocusResume() {
+  const { focus } = state;
+  if (focus.phase !== "running" || !isPaused(focus.timer)) return;
+  setTimer(resumeTimer(focus.timer, Date.now()));
+}
+
+// Giving up (confirmed): no bonus.
 function quitFocus() {
-  if (state.focus.phase !== "running") return; // it finished while the dialog was open
+  if (state.focus.phase !== "running") return;
   stopTicking();
   state.focus = idleFocus();
   save("timer", null);
@@ -336,7 +363,6 @@ function quitFocus() {
 // The saved timer is removed first so a reload cannot give the bonus twice.
 function finishTimer() {
   stopTicking();
-  ui.closeQuitFocus(); // the player may have the "그만하기" question open at this moment
   save("timer", null);
   const before = state.profile;
   const result = applyTimerWithCheckIn(before, Date.now());
@@ -531,6 +557,8 @@ ui.bindEvents({
   onVisible: handleVisible,
   onFocusStart: handleFocusStart,
   onFocusCancel: handleFocusCancel,
+  onFocusResume: handleFocusResume,
+  onOpenNotes: () => handleTab("notes"),
   onFocusQuiz: handleFocusQuiz,
   onFocusBack: handleFocusBack,
   onAdd: handleAdd,
@@ -552,5 +580,5 @@ resetQuiz();
 refreshFocus();
 if (state.focus.phase === "running") {
   tickTimer(); // may already be over (page closed while it ran): then the finish screen shows
-  if (state.focus.phase === "running") startTicking();
+  if (state.focus.phase === "running" && !isPaused(state.focus.timer)) startTicking();
 }

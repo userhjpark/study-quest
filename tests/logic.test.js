@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   SAMPLE_CONCEPTS, DEFAULT_SUBJECT, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
   listSubjects, filterBySubject, resolveSubject, isDuplicate,
-  normalizeFilter, groupBySubject, visibleGroups,
+  normalizeFilter, groupBySubject, visibleGroups, hasOwnConcepts,
 } from "../js/concepts.js";
 import { detectSeparator, parseLines, buildPreview, MAX_IMPORT } from "../js/importer.js";
 import {
@@ -940,6 +940,28 @@ test("sanitizeTimer rejects broken paused timers", () => {
   assert.equal(sanitizeTimer({ ...ok, pausedMs: 1.5 }), null);
   assert.equal(sanitizeTimer({ ...ok, pausedMs: "5" }), null);
   assert.equal(sanitizeTimer({ ...ok, endAt: T0 }), null); // both set: ambiguous
+});
+
+/* ---------- concepts.js: "내 개념을 추가해보세요" hint ---------- */
+
+test("hasOwnConcepts is false for the untouched samples and for an empty list", () => {
+  assert.equal(hasOwnConcepts(SAMPLE_CONCEPTS), false);
+  assert.equal(hasOwnConcepts([]), false);
+  assert.equal(hasOwnConcepts(SAMPLE_CONCEPTS.slice(0, 3)), false); // some samples deleted
+});
+test("hasOwnConcepts becomes true when the user adds a concept, even if samples are deleted", () => {
+  const added = addConcept(SAMPLE_CONCEPTS, "새 개념", "새 정의", "내 과목").concepts;
+  assert.equal(hasOwnConcepts(added), true);
+  assert.equal(hasOwnConcepts(added.filter((c) => c.id.startsWith("c"))), true);
+});
+test("hasOwnConcepts is false again after the user deletes their own concept", () => {
+  const added = addConcept(SAMPLE_CONCEPTS, "새 개념", "새 정의", "내 과목").concepts;
+  const own = added.find((c) => c.term === "새 개념");
+  assert.equal(hasOwnConcepts(deleteConcept(added, own.id)), false);
+});
+test("hasOwnConcepts is true after a bulk import", () => {
+  const r = addMany(SAMPLE_CONCEPTS, [{ term: "가", definition: "나" }], "과목");
+  assert.equal(hasOwnConcepts(r.concepts), true);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

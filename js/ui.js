@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const SEP_BY_NAME = { ":": ":", "/": "/", tab: "\t" };
 
 let pendingLeave = null;
-let pendingQuitFocus = null;
+let quitHandlers = null; // { onQuit, onKeep } while the quit-timer dialog is open
 
 export function bindEvents(h) {
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -38,16 +38,27 @@ export function bindEvents(h) {
     btn.addEventListener("click", () => h.onFocusStart(Number(btn.dataset.minutes)));
   });
   $("focus-cancel-btn").addEventListener("click", h.onFocusCancel);
-  // Quit dialog: "계속하기" (or Esc) just closes it; "그만하기" closes it and runs the saved action.
+  $("focus-quit-btn").addEventListener("click", h.onFocusCancel);
+  $("focus-resume-btn").addEventListener("click", h.onFocusResume);
+  // Quit dialog (the timer is paused while it is open). "그만하기" runs onQuit. Any other way of
+  // closing it ("계속하기", Esc) runs onKeep, which resumes the timer.
   const quitDialog = $("quit-focus-dialog");
   $("quit-focus-stay-btn").addEventListener("click", () => quitDialog.close());
   $("quit-focus-confirm-btn").addEventListener("click", () => {
-    const action = pendingQuitFocus;
-    pendingQuitFocus = null;
+    const handlers = quitHandlers;
+    quitHandlers = null; // cleared first, so the "close" event below does not call onKeep
     quitDialog.close();
-    if (action) action();
+    if (handlers) handlers.onQuit();
   });
-  quitDialog.addEventListener("close", () => { pendingQuitFocus = null; });
+  quitDialog.addEventListener("close", () => {
+    const handlers = quitHandlers;
+    quitHandlers = null;
+    if (handlers) handlers.onKeep();
+  });
+
+  document.querySelectorAll(".open-notes-btn").forEach((btn) => {
+    btn.addEventListener("click", h.onOpenNotes);
+  });
   $("focus-quiz-btn").addEventListener("click", h.onFocusQuiz);
   $("focus-back-btn").addEventListener("click", h.onFocusBack);
 
@@ -75,15 +86,16 @@ export function askLeave(onLeave) {
   $("leave-dialog").showModal();
 }
 
-export function askQuitFocus(onQuit) {
-  pendingQuitFocus = onQuit;
-  $("quit-focus-dialog").showModal();
+export function askQuitFocus(handlers) {
+  const dialog = $("quit-focus-dialog");
+  if (dialog.open) return;
+  quitHandlers = handlers;
+  dialog.showModal();
 }
 
-// Closes the quit dialog without running its action (e.g. the timer finished meanwhile).
-export function closeQuitFocus() {
-  const dialog = $("quit-focus-dialog");
-  if (dialog.open) dialog.close();
+// Small "내 개념을 추가해보세요" box on the 집중 and 퀴즈 start screens.
+export function setOwnConceptsHint(visible) {
+  document.querySelectorAll(".own-hint").forEach((el) => { el.hidden = !visible; });
 }
 
 export function showTab(name) {
@@ -483,13 +495,20 @@ export function showFocus(phase) {
 }
 
 // timeText is "MM:SS"; fraction is 0..1. The page title shows the time too, so it can be read
-// from another browser tab.
-export function renderTimer(timeText, fraction) {
+// from another browser tab. A paused timer shows "일시정지됨" with 계속하기 / 그만하기.
+export function renderTimer(timeText, fraction, paused) {
   const percent = Math.round(fraction * 100);
+  $("focus-running").classList.toggle("is-paused", paused);
+  $("focus-status").textContent = paused ? "일시정지됨" : "집중하는 중";
+  $("focus-note").textContent = paused
+    ? "타이머가 멈춰 있어요. 계속하기를 누르면 남은 시간부터 이어져요."
+    : "다른 탭으로 옮겨도 타이머는 계속 돌아가요.";
+  $("focus-cancel-btn").hidden = paused;
+  $("focus-paused-actions").hidden = !paused;
   $("focus-time").textContent = timeText;
   $("focus-fill").style.width = `${percent}%`;
   $("focus-bar").setAttribute("aria-valuenow", String(percent));
-  document.title = `${timeText} · ${BASE_TITLE}`;
+  document.title = `${paused ? "일시정지 " : ""}${timeText} · ${BASE_TITLE}`;
 }
 
 export function showTimerDone({ reward, subjectLabel }) {
