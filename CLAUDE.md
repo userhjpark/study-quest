@@ -76,7 +76,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - A small **"오늘의 공부" card at the top of the 집중 tab** showing today's focus minutes, quiz rounds, accuracy, and streak, built from data we already save (`profile.daily.focusMinutes`, the "최근 기록" history, `profile.checkIn`). Note: the history keeps only the newest 10 rounds, so "today's rounds/accuracy" counts the rounds of today within those 10. Keep the calculation in a pure function with tests.
 - If time allows after that: a **7-day focus-minutes bar chart**. This needs a small per-day record (date -> focus minutes, last 7 days) that is not saved yet, because only today's minutes are kept now.
 
-**Stage 4 (optional)**: decide on **Oct 30 evening** between two options (choose one). If Stages 1-3 are not done by then, drop it and list it as a future feature in the README.
+**Stage 4 (optional)**: decide on **Oct 30 evening** (moved to Oct 31 morning by the user) between two options (choose one). If Stages 1-3 are not done by then, drop it and list it as a future feature in the README.
 
 *Option A: PDF import*
 - Read text-based PDFs only (no scanned/OCR) with pdf.js, loaded from a CDN at a pinned version (do not commit the library; mention it as a third-party library in the README).
@@ -163,10 +163,10 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Header profile bar: level, XP bar, coins, streak, "오늘 N/600 XP", check-in button.
 - Leaving a running quiz round for either 노트 or 집중 shows the in-page leave dialog.
 - Tests: 147 Node tests pass (`node tests/logic.test.js`); manual checklist has a Stage 2 section and a section for the new-user hint.
-- **After the Stage 2 commit (Oct 29):** pause-on-quit, the tab order 집중 · 노트 · 퀴즈 with 집중 as the default and the "내 개념을 추가해보세요" hint (passed the user's retest); then the custom timer length, the minute-based timer bonus with the 180-minute cap, and the quiz-subject dropdowns on the 집중 tab (see the decisions above). Waiting for the user's retest of these three before pushing.
+- **After the Stage 2 commit (Oct 29):** pause-on-quit, the tab order 집중 · 노트 · 퀴즈 with 집중 as the default and the "내 개념을 추가해보세요" hint (passed the user's retest); then the custom timer length, the minute-based timer bonus with the 180-minute cap, and the quiz-subject dropdowns on the 집중 tab (see the decisions above). These passed the user's retest and were pushed (`f0e6ef4`, Oct 29).
 - New known limitations were added above (two tabs, XP only given when a round ends, coins not capped). Also: no sound or notification when the timer ends.
 
-Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 3 was pushed Oct 30).
+Live site: https://userhjpark.github.io/study-quest/ (Stage 3 pushed Oct 30; files verified identical to local, and the user's phone check of the live site passed).
 
 **Stage 3 is complete (Oct 30).** Built in five steps; the 캐릭터 tab passed the user's manual test and the gallery page was checked by the user:
 - `js/character.js` (rules), `js/avatar-art.js` (4 animals + 15 items as shape data), `js/ui-character.js` (renderer + shop screen), `tests/avatar-gallery.html`.
@@ -176,6 +176,5 @@ Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build o
 **Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `js/character.js`, `js/avatar-art.js`, `js/ui-character.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`, `tests/avatar-gallery.html`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
 **Next (in order):**
-1. After the user's retest of the pause dialog, tab order and hint: push the Stage 2 commits and re-check the Pages build.
-2. **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
-3. Optionally the "오늘의 공부" card (see above). Then README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
+1. **Oct 31 (the user decides first thing):** Stage 4 (A: PDF import, B: Firebase leaderboard, or skip and list it as future work). Stages 1-3 are done and pushed, so we are on track; skipping leaves more room for the items below.
+2. Optionally the "오늘의 공부" card (see above). Then README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
