@@ -17,6 +17,12 @@ import {
   buildRoundRecord, addRecord, sanitizeHistory, HISTORY_LIMIT, ALL_SUBJECTS_LABEL,
 } from "../js/history.js";
 
+import {
+  DAILY_XP_CAP, TIMER_BONUS_XP, TIMER_BONUS_COINS, TIMER_BONUS_MAX_PER_DAY,
+  freshProfile, sanitizeProfile, dateKey, xpForLevel, levelForXp, levelProgress,
+  rewardsForRound, applyRound, applyTimerBonus, xpLeftToday,
+} from "../js/rewards.js";
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -527,6 +533,126 @@ test("sanitizeHistory handles non-arrays, filters bad missed terms, caps the len
   assert.deepEqual(r[0].missedTerms, ["ok"]);
   const many = Array.from({ length: 15 }, (_, i) => recOf(i));
   assert.equal(sanitizeHistory(many).length, HISTORY_LIMIT);
+});
+
+/* ---------- rewards.js: levels, XP, coins, daily cap ---------- */
+
+const at = (day, hour = 12) => new Date(2026, 9, day, hour).getTime(); // Oct <day> 2026, local time
+const roundRec = (over = {}) => ({
+  finishedAt: 0, subject: "S", score: 100, correct: 10, total: 10, retryCorrect: 0, retryTotal: 0,
+  missedTerms: [], ...over,
+});
+
+test("xpForLevel follows 50*L*(L-1): 0, 100, 300, 600", () => {
+  assert.deepEqual([1, 2, 3, 4].map(xpForLevel), [0, 100, 300, 600]);
+});
+test("levelForXp is exact at the boundaries", () => {
+  assert.equal(levelForXp(0), 1);
+  assert.equal(levelForXp(99), 1);
+  assert.equal(levelForXp(100), 2);
+  assert.equal(levelForXp(299), 2);
+  assert.equal(levelForXp(300), 3);
+  assert.equal(levelForXp(599), 3);
+  assert.equal(levelForXp(600), 4);
+});
+test("levelForXp agrees with xpForLevel for every level up to 200", () => {
+  for (let level = 1; level <= 200; level++) {
+    const xp = xpForLevel(level);
+    assert.equal(levelForXp(xp), level);
+    if (xp > 0) assert.equal(levelForXp(xp - 1), level - 1);
+  }
+});
+test("levelProgress gives the position inside the current level", () => {
+  assert.deepEqual(levelProgress(0), { level: 1, into: 0, needed: 100 });
+  assert.deepEqual(levelProgress(150), { level: 2, into: 50, needed: 200 });
+});
+test("rewardsForRound: XP is the score, coins are 1 per correct (+5 if perfect)", () => {
+  assert.deepEqual(rewardsForRound(roundRec({ score: 85, correct: 8 })), { xp: 85, coins: 8 });
+  assert.deepEqual(rewardsForRound(roundRec({ score: 195, correct: 10 })), { xp: 195, coins: 15 });
+});
+test("rewardsForRound: the retry part gives nothing", () => {
+  const without = rewardsForRound(roundRec({ score: 80, correct: 8, retryTotal: 0 }));
+  const withRetry = rewardsForRound(roundRec({ score: 80, correct: 8, retryTotal: 2, retryCorrect: 2 }));
+  assert.deepEqual(withRetry, without);
+});
+test("rewardsForRound: an empty round (0 questions) is not a perfect round", () => {
+  assert.deepEqual(rewardsForRound(roundRec({ score: 0, correct: 0, total: 0 })), { xp: 0, coins: 0 });
+});
+test("applyRound adds XP and coins and reports what was gained", () => {
+  const r = applyRound(freshProfile(), roundRec({ score: 85, correct: 8 }), at(29));
+  assert.equal(r.profile.xp, 85);
+  assert.equal(r.profile.coins, 8);
+  assert.deepEqual(r.gained, { xp: 85, coins: 8, capped: false });
+  assert.equal(r.profile.daily.date, dateKey(at(29)));
+});
+test("applyRound does not change the profile it was given", () => {
+  const before = freshProfile();
+  applyRound(before, roundRec(), at(29));
+  assert.deepEqual(before, freshProfile());
+});
+test("daily cap: XP stops at the cap, the last round is cut off and flagged", () => {
+  let profile = freshProfile();
+  const big = roundRec({ score: 195, correct: 10 });
+  for (let i = 0; i < 3; i++) profile = applyRound(profile, big, at(29)).profile; // 585 XP
+  assert.equal(profile.xp, 585);
+  const r = applyRound(profile, big, at(29));
+  assert.equal(r.gained.xp, DAILY_XP_CAP - 585); // only 15 left
+  assert.equal(r.gained.capped, true);
+  assert.equal(r.profile.xp, DAILY_XP_CAP);
+  assert.equal(r.gained.coins, 15); // coins are not capped
+});
+test("daily cap: after the cap a round gives 0 XP but still gives coins", () => {
+  let profile = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP }), at(29)).profile;
+  const r = applyRound(profile, roundRec({ score: 100, correct: 10 }), at(29));
+  assert.equal(r.gained.xp, 0);
+  assert.equal(r.gained.capped, true);
+  assert.equal(r.gained.coins, 15);
+  assert.equal(xpLeftToday(r.profile, at(29)), 0);
+});
+test("daily cap: a new calendar day starts the count again", () => {
+  let profile = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP }), at(29)).profile;
+  assert.equal(xpLeftToday(profile, at(29, 23)), 0);
+  assert.equal(xpLeftToday(profile, at(30, 0)), DAILY_XP_CAP);
+  const r = applyRound(profile, roundRec({ score: 100 }), at(30, 0));
+  assert.equal(r.gained.xp, 100);
+  assert.equal(r.profile.xp, DAILY_XP_CAP + 100);
+});
+test("timer bonus gives a small XP and coin amount", () => {
+  const r = applyTimerBonus(freshProfile(), at(29));
+  assert.equal(r.granted, true);
+  assert.deepEqual(r.gained, { xp: TIMER_BONUS_XP, coins: TIMER_BONUS_COINS, capped: false });
+  assert.equal(r.profile.xp, TIMER_BONUS_XP);
+});
+test("timer bonus: only TIMER_BONUS_MAX_PER_DAY times a day, then nothing", () => {
+  let profile = freshProfile();
+  for (let i = 0; i < TIMER_BONUS_MAX_PER_DAY; i++) {
+    const r = applyTimerBonus(profile, at(29));
+    assert.equal(r.granted, true);
+    profile = r.profile;
+  }
+  const extra = applyTimerBonus(profile, at(29));
+  assert.equal(extra.granted, false);
+  assert.deepEqual(extra.gained, { xp: 0, coins: 0, capped: false });
+  assert.equal(extra.profile.xp, TIMER_BONUS_XP * TIMER_BONUS_MAX_PER_DAY);
+  assert.equal(applyTimerBonus(extra.profile, at(30)).granted, true); // next day works again
+});
+test("timer bonus counts toward the daily XP cap", () => {
+  const profile = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP - 2 }), at(29)).profile;
+  const r = applyTimerBonus(profile, at(29));
+  assert.equal(r.gained.xp, 2);
+  assert.equal(r.gained.capped, true);
+  assert.equal(r.gained.coins, TIMER_BONUS_COINS);
+});
+test("leaving the timer running cannot be farmed: 3 bonuses are worth at most 15 XP a day", () => {
+  assert.equal(TIMER_BONUS_XP * TIMER_BONUS_MAX_PER_DAY, 15);
+});
+test("sanitizeProfile repairs missing, negative and non-number data", () => {
+  assert.deepEqual(sanitizeProfile(null), freshProfile());
+  assert.deepEqual(sanitizeProfile("x"), freshProfile());
+  const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, timerBonuses: 2.7 } });
+  assert.deepEqual(p, { xp: 0, coins: 0, daily: { date: "", xp: 0, timerBonuses: 2 } });
+  assert.deepEqual(sanitizeProfile({ xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 } }),
+    { xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 } });
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
