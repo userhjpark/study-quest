@@ -25,6 +25,10 @@ import {
   xpEarnedToday, applyRoundWithCheckIn, applyTimerWithCheckIn,
 } from "../js/rewards.js";
 
+import {
+  DURATIONS, startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer,
+} from "../js/timer.js";
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -811,6 +815,63 @@ test("xpEarnedToday counts today's XP only and starts again on a new day", () =>
   assert.equal(xpEarnedToday(p, at(29, 23)), 590);
   assert.equal(xpEarnedToday(p, at(30, 1)), 0);
   assert.equal(p.xp, 590); // total XP (the level bar) is a separate number
+});
+
+/* ---------- timer.js: timestamp-based focus timer ---------- */
+
+const T0 = at(29, 10);
+const MIN = 60_000;
+
+test("timer offers 1 (demo), 10, 15 and 25 minutes", () => {
+  assert.deepEqual(DURATIONS, [1, 10, 15, 25]);
+});
+test("startTimer stores the end time (start + minutes)", () => {
+  assert.deepEqual(startTimer(T0, 25), { startedAt: T0, endAt: T0 + 25 * MIN, minutes: 25 });
+});
+test("remaining time is computed from the clock, not counted", () => {
+  const t = startTimer(T0, 10);
+  assert.equal(remainingMs(t, T0), 10 * MIN);
+  assert.equal(remainingMs(t, T0 + 4 * MIN), 6 * MIN);
+  assert.equal(remainingMs(t, T0 + 10 * MIN - 1), 1);
+});
+test("background throttling: no ticks for 7 minutes, the next read is still exact", () => {
+  const t = startTimer(T0, 10);
+  assert.equal(remainingMs(t, T0 + 7 * MIN + 123), 3 * MIN - 123);
+  assert.equal(isFinished(t, T0 + 7 * MIN), false);
+});
+test("timer finishes exactly at the end time and stays finished", () => {
+  const t = startTimer(T0, 1);
+  assert.equal(isFinished(t, T0 + MIN - 1), false);
+  assert.equal(isFinished(t, T0 + MIN), true);
+  assert.equal(remainingMs(t, T0 + 3 * 3600_000), 0); // opened hours later: 0, never negative
+});
+test("edge case: clock set backwards does not make the timer longer than it was", () => {
+  const t = startTimer(T0, 10);
+  assert.equal(remainingMs(t, T0 - 5 * MIN), 10 * MIN);
+  assert.equal(isFinished(t, T0 - 5 * MIN), false);
+});
+test("progress goes from 0 to 1", () => {
+  const t = startTimer(T0, 10);
+  assert.equal(progress(t, T0), 0);
+  assert.equal(progress(t, T0 + 5 * MIN), 0.5);
+  assert.equal(progress(t, T0 + 20 * MIN), 1);
+});
+test("formatRemaining shows MM:SS and rounds up to the next second", () => {
+  assert.equal(formatRemaining(25 * MIN), "25:00");
+  assert.equal(formatRemaining(61_000), "01:01");
+  assert.equal(formatRemaining(59_001), "01:00");
+  assert.equal(formatRemaining(1), "00:01");
+  assert.equal(formatRemaining(0), "00:00");
+});
+test("sanitizeTimer keeps a real timer and rejects broken or edited ones", () => {
+  const t = startTimer(T0, 15);
+  assert.deepEqual(sanitizeTimer(t), t);
+  assert.equal(sanitizeTimer(null), null);
+  assert.equal(sanitizeTimer("x"), null);
+  assert.equal(sanitizeTimer({ ...t, minutes: 7 }), null); // not an offered length
+  assert.equal(sanitizeTimer({ ...t, endAt: t.endAt + 1 }), null); // length does not match minutes
+  assert.equal(sanitizeTimer({ ...t, startedAt: "now" }), null);
+  assert.equal(sanitizeTimer({ minutes: 10 }), null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
