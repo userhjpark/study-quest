@@ -30,6 +30,12 @@ import {
   isPaused, pauseTimer, resumeTimer,
 } from "../js/timer.js";
 
+import {
+  ANIMAL_PRICE, ANIMALS, SLOTS, CATEGORIES, ITEMS, findAnimal, findItem, freshCharacter, hasAnimal,
+  isOwned, isEquipped, pickFirstAnimal, buy, equip, unequipSlot, previewCharacter, sanitizeCharacter,
+  notEnoughCoinsMessage,
+} from "../js/character.js";
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -1094,6 +1100,218 @@ test("hasOwnConcepts is false again after the user deletes their own concept", (
 test("hasOwnConcepts is true after a bulk import", () => {
   const r = addMany(SAMPLE_CONCEPTS, [{ term: "가", definition: "나" }], "과목");
   assert.equal(hasOwnConcepts(r.concepts), true);
+});
+
+/* ---------- character.js: animals, items, buying, try-on ---------- */
+
+const withCat = () => pickFirstAnimal(freshCharacter(), "cat").character;
+
+test("catalog: four animals, ids are unique across animals and items", () => {
+  assert.deepEqual(ANIMALS.map((a) => a.id), ["cat", "dog", "hamster", "capybara"]);
+  const ids = [...ANIMALS, ...ITEMS].map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+test("catalog: every item has a known slot and category, and a positive whole price", () => {
+  const categories = CATEGORIES.map((c) => c.id);
+  for (const item of ITEMS) {
+    assert.ok(SLOTS.includes(item.slot), item.id);
+    assert.ok(categories.includes(item.category), item.id);
+    assert.ok(Number.isInteger(item.price) && item.price > 0, item.id);
+    assert.ok(item.name.length > 0, item.id);
+  }
+  for (const animal of ANIMALS) assert.equal(animal.price, ANIMAL_PRICE);
+});
+test("catalog: the planned items exist, 왕관 is the most expensive, nothing is dropped by mistake", () => {
+  assert.equal(ITEMS.length, 15);
+  const crown = ITEMS.find((i) => i.id === "crown");
+  assert.equal(crown.price, Math.max(...ITEMS.map((i) => i.price), ANIMAL_PRICE));
+  for (const id of ["headphones", "pencil", "bag"]) assert.ok(findItem(id), id); // study items
+  assert.equal(findItem("mustache"), null);
+  assert.equal(ITEMS.filter((i) => i.category === "color").length, 5);
+  assert.equal(ITEMS.filter((i) => i.category === "hat").length, 5);
+});
+test("catalog: the cheapest item is cheap enough for the first purchase after 2-3 rounds", () => {
+  assert.ok(Math.min(...ITEMS.map((i) => i.price)) <= 30);
+  assert.ok(ANIMAL_PRICE <= 60);
+});
+test("catalog: headwear (hat slot) includes the pencil headband; headphones and the bag have their own slots", () => {
+  assert.equal(findItem("pencil").slot, "hat");
+  assert.equal(findItem("headphones").slot, "ears");
+  assert.equal(findItem("bag").slot, "back");
+  assert.notEqual(findItem("glasses").slot, findItem("blush").slot); // glasses + blush can be worn together
+});
+
+test("a new character has no animal, nothing owned and nothing worn", () => {
+  const c = freshCharacter();
+  assert.equal(hasAnimal(c), false);
+  assert.deepEqual(c.ownedAnimals, []);
+  assert.deepEqual(c.ownedItems, []);
+  assert.deepEqual(Object.keys(c.equipped), SLOTS);
+  assert.ok(Object.values(c.equipped).every((v) => v === null));
+});
+test("the first animal is free: it becomes owned and chosen, coins are not involved", () => {
+  const r = pickFirstAnimal(freshCharacter(), "hamster");
+  assert.equal(r.error, null);
+  assert.equal(r.character.animal, "hamster");
+  assert.deepEqual(r.character.ownedAnimals, ["hamster"]);
+  assert.equal(hasAnimal(r.character), true);
+});
+test("the free pick works only once, and only for a real animal", () => {
+  const once = withCat();
+  const again = pickFirstAnimal(once, "dog");
+  assert.match(again.error, /이미/);
+  assert.equal(again.character, once);
+  assert.match(pickFirstAnimal(freshCharacter(), "dragon").error, /알 수 없는/);
+  assert.match(pickFirstAnimal(freshCharacter(), "mint").error, /알 수 없는/); // an item is not an animal
+});
+test("buying an item takes its price and puts it on at once", () => {
+  const r = buy(withCat(), 100, "beanie");
+  assert.equal(r.error, null);
+  assert.equal(r.coins, 70);
+  assert.deepEqual(r.character.ownedItems, ["beanie"]);
+  assert.equal(r.character.equipped.hat, "beanie");
+  assert.equal(isOwned(r.character, "beanie"), true);
+  assert.equal(isEquipped(r.character, "beanie"), true);
+});
+test("buying an animal costs 60, and the character switches to it", () => {
+  const r = buy(withCat(), 80, "dog");
+  assert.equal(r.error, null);
+  assert.equal(r.coins, 20);
+  assert.equal(r.character.animal, "dog");
+  assert.deepEqual(r.character.ownedAnimals, ["cat", "dog"]);
+});
+test("edge case: not enough coins - a clear message, nothing changes", () => {
+  const c = withCat();
+  const r = buy(c, 18, "beanie"); // costs 30
+  assert.equal(r.error, "코인이 12개 부족해요.");
+  assert.equal(r.character, c);
+  assert.equal(r.coins, 18);
+  assert.equal(buy(c, 59, "dog").error, "코인이 1개 부족해요.");
+  assert.equal(buy(c, 0, "crown").error, "코인이 150개 부족해요.");
+});
+test("exactly enough coins is enough (coins go to 0)", () => {
+  const r = buy(withCat(), 30, "beanie");
+  assert.equal(r.error, null);
+  assert.equal(r.coins, 0);
+});
+test("buying something already owned is refused and costs nothing", () => {
+  const bought = buy(withCat(), 200, "cap");
+  const again = buy(bought.character, bought.coins, "cap");
+  assert.match(again.error, /이미/);
+  assert.equal(again.coins, bought.coins);
+  assert.match(buy(withCat(), 200, "cat").error, /이미/); // the animal you already have
+});
+test("buying needs a first animal, and an unknown id is refused", () => {
+  assert.match(buy(freshCharacter(), 500, "beanie").error, /먼저/);
+  assert.match(buy(freshCharacter(), 500, "dog").error, /먼저/);
+  assert.match(buy(withCat(), 500, "unicorn").error, /알 수 없는/);
+});
+test("buy does not change the character it was given", () => {
+  const c = withCat();
+  buy(c, 100, "beanie");
+  assert.deepEqual(c, withCat());
+});
+test("a new item replaces the one in the same slot, different slots combine", () => {
+  let c = buy(withCat(), 500, "beanie").character;
+  c = buy(c, 500, "crown").character;
+  assert.equal(c.equipped.hat, "crown"); // replaced
+  assert.deepEqual(c.ownedItems, ["beanie", "crown"]); // but still owned
+  c = buy(c, 500, "glasses").character;
+  c = buy(c, 500, "blush").character;
+  assert.equal(c.equipped.eyes, "glasses");
+  assert.equal(c.equipped.cheek, "blush");
+  assert.equal(c.equipped.hat, "crown");
+});
+test("equip puts on an owned item again; unequip takes it off but keeps it", () => {
+  let c = buy(withCat(), 500, "beanie").character;
+  c = buy(c, 500, "cap").character; // cap replaces beanie
+  c = equip(c, "beanie");
+  assert.equal(c.equipped.hat, "beanie");
+  c = unequipSlot(c, "hat");
+  assert.equal(c.equipped.hat, null);
+  assert.equal(isOwned(c, "beanie"), true);
+  assert.equal(equip(c, "cap").equipped.hat, "cap");
+});
+test("equip ignores things that are not owned", () => {
+  const c = withCat();
+  assert.equal(equip(c, "crown"), c);
+  assert.equal(equip(c, "dog"), c);
+  assert.equal(equip(c, "nope"), c);
+});
+test("owned animals can be switched freely and items stay on", () => {
+  let c = buy(withCat(), 500, "beanie").character;
+  c = buy(c, 500, "dog").character;
+  assert.equal(c.animal, "dog");
+  c = equip(c, "cat");
+  assert.equal(c.animal, "cat");
+  assert.equal(c.equipped.hat, "beanie"); // the hat follows the animal
+  assert.equal(isEquipped(c, "cat"), true);
+  assert.equal(isEquipped(c, "dog"), false);
+});
+test("unequipSlot ignores unknown slots", () => {
+  const c = withCat();
+  assert.equal(unequipSlot(c, "wings"), c);
+});
+
+test("try-on shows an item or animal that is not owned, without changing anything", () => {
+  const c = buy(withCat(), 500, "beanie").character;
+  const hat = previewCharacter(c, "crown");
+  assert.equal(hat.equipped.hat, "crown");
+  assert.equal(isOwned(hat, "crown"), false); // still not owned
+  assert.deepEqual(hat.ownedItems, c.ownedItems);
+  assert.equal(c.equipped.hat, "beanie"); // the real character is untouched
+  const dog = previewCharacter(c, "dog");
+  assert.equal(dog.animal, "dog");
+  assert.equal(dog.equipped.hat, "beanie"); // keeps what is worn
+  assert.deepEqual(dog.ownedAnimals, ["cat"]);
+  assert.equal(previewCharacter(c, "nope"), c);
+});
+test("try-on works before the first pick, so the free animal can be seen first", () => {
+  const p = previewCharacter(freshCharacter(), "capybara");
+  assert.equal(p.animal, "capybara");
+  assert.deepEqual(p.ownedAnimals, []);
+});
+test("try-on then buy: the bought item is what was previewed, coins go down once", () => {
+  const c = withCat();
+  const preview = previewCharacter(c, "wizard");
+  const bought = buy(c, 100, "wizard");
+  assert.deepEqual(bought.character.equipped, preview.equipped);
+  assert.equal(bought.coins, 30);
+});
+test("notEnoughCoinsMessage counts the missing coins", () => {
+  assert.equal(notEnoughCoinsMessage(150, 138), "코인이 12개 부족해요.");
+});
+
+test("sanitizeCharacter keeps a valid saved character as it is", () => {
+  const c = buy(buy(withCat(), 500, "dog").character, 500, "crown").character;
+  assert.deepEqual(sanitizeCharacter(JSON.parse(JSON.stringify(c))), c);
+});
+test("sanitizeCharacter repairs missing, broken and edited data", () => {
+  assert.deepEqual(sanitizeCharacter(null), freshCharacter());
+  assert.deepEqual(sanitizeCharacter("x"), freshCharacter());
+  assert.deepEqual(sanitizeCharacter({}), freshCharacter());
+  const messy = sanitizeCharacter({
+    animal: "dragon", ownedAnimals: ["cat", "cat", "unicorn", 5, "dog"],
+    ownedItems: ["beanie", "beanie", "wings", null],
+    equipped: { hat: "crown", color: "beanie", eyes: "glasses", ears: "headphones", bogus: "cap" },
+  });
+  assert.deepEqual(messy.ownedAnimals, ["cat", "dog"]); // unknown and repeated dropped
+  assert.equal(messy.animal, "cat"); // unknown animal -> the first owned one
+  assert.deepEqual(messy.ownedItems, ["beanie"]);
+  assert.equal(messy.equipped.hat, null); // crown is not owned
+  assert.equal(messy.equipped.color, null); // beanie is not a colour
+  assert.equal(messy.equipped.eyes, null); // glasses not owned
+  assert.deepEqual(Object.keys(messy.equipped), SLOTS); // no extra slots
+});
+test("sanitizeCharacter: an animal that is not owned is not accepted, an owned one is kept", () => {
+  assert.equal(sanitizeCharacter({ animal: "dog", ownedAnimals: ["cat"] }).animal, "cat");
+  assert.equal(sanitizeCharacter({ animal: "dog", ownedAnimals: ["cat", "dog"] }).animal, "dog");
+  assert.equal(sanitizeCharacter({ animal: "dog", ownedAnimals: [] }).animal, null);
+});
+test("sanitizeCharacter: an item worn in the wrong slot is taken off", () => {
+  const r = sanitizeCharacter({ ownedItems: ["beanie"], equipped: { eyes: "beanie", hat: "beanie" } });
+  assert.equal(r.equipped.eyes, null);
+  assert.equal(r.equipped.hat, "beanie");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
