@@ -96,6 +96,32 @@ Use clean data for the first items (private window or "Clear site data").
 - [ ] A concept deleted after the round still shows in the history's missed list.
 - [ ] **Known limitation (two tabs):** with the site open in two tabs, a finished round in one tab can overwrite progress saved by the other tab. Reload before testing after editing localStorage in the console.
 
+## Stage 2: Focus timer (집중)
+
+Use the 1-minute option ("1분 (데모)") for most of these. Reload with Ctrl+Shift+R first.
+
+- [ ] There are three tabs: 노트, 집중, 퀴즈. All fit on a phone-width screen.
+- [ ] The 집중 tab shows four buttons: 1분 (데모), 10분, 15분, 25분.
+- [ ] Tap "1분 (데모)": the timer starts at once and counts down (01:00, 00:59, ...), the bar fills, and the browser tab title shows the time too.
+- [ ] Switch to 노트 and back to 집중: the time is still correct (the timer was not reset).
+- [ ] Reload the page while it runs: the timer continues with the right remaining time.
+- [ ] **Background:** start a timer, switch to another browser tab for about 30 seconds, come back: the time matches the real elapsed time.
+- [ ] **Finish on the 집중 tab:** the screen changes to "집중 완료!" with "+5 XP, +2 코인" (and the green "출석 체크 완료!" line if it is the first activity today). The header XP/coins went up.
+- [ ] **Finish on another tab:** start a timer, go to 노트, wait for the end. A yellow dot appears on the 집중 tab. Opening it shows "집중 완료!" and the dot disappears.
+- [ ] **Closed page:** start a timer, close the page, reopen it after the end time. The "집중 완료!" screen is there once; after another reload the tab is back to the start (no second bonus).
+- [ ] **퀴즈 시작:** one tap goes to the 퀴즈 tab and a round starts in the subject shown on the finish screen ("퀴즈 과목: …").
+- [ ] **Edge case:** choose a subject with fewer than 4 concepts in the 퀴즈 tab, finish a timer, tap "퀴즈 시작": you land on the 퀴즈 tab with the red "need 4 concepts" message and no round starts.
+- [ ] "타이머로 돌아가기" returns to the four buttons without starting a quiz.
+- [ ] **그만하기 (보너스 없음):** while running, tap it: an in-page dialog "집중을 그만할까요?" appears (not the browser's own popup).
+  - [ ] "계속하기" (or Esc) closes it and the timer keeps running.
+  - [ ] "그만하기" goes back to the four buttons, XP and coins unchanged, nothing saved (a reload shows no timer).
+  - [ ] **Edge case:** with a 1-minute timer, open the dialog and wait for the end without answering: the dialog closes by itself and the "집중 완료!" screen shows with the bonus (the timer was not cancelled).
+- [ ] **Daily limit:** finish four timers on the same day: the first three give +5 XP, +2 코인; the fourth says the day's timer bonus is used up and gives nothing.
+- [ ] **Not farmable:** leaving a timer running forever gives nothing; only finishing it gives the small bonus, at most 3 times a day.
+- [ ] **Leave dialog:** during a quiz round, tap the 집중 tab: the "퀴즈에서 나갈까요?" dialog appears (like for 노트). "계속하기" stays in the round.
+- [ ] The "오늘 N/600 XP" line in the header includes the timer's 5 XP.
+- [ ] Known limitation: no sound or notification when the timer ends; the page only shows the dot and the title. A phone may pause the page in the background, but the remaining time is right as soon as you return.
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.

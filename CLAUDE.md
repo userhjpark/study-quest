@@ -49,7 +49,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - **Approved numbers (Oct 29)**: XP per round = main-part score (10 per correct + combo bonus); coins = 1 per correct answer + 5 for a perfect round; daily XP cap **600** (a perfect round with combos is almost 200 XP, so 300 would block after 2 rounds); timer bonus 5 XP + 2 coins per finished timer, at most 3 per day, nothing if quit early; level L needs 50*L*(L-1) total XP; check-in 10 XP + 5 coins + 1 coin per streak day (max +7), check-in XP is outside the cap; **finishing a quiz round or a focus timer also does today's check-in automatically** (bonus only once per day, whichever way it happens; shown on the result screen); the profile bar also shows "오늘 N/600 XP"; a missed day resets the streak to 1.
 - **Timer UI**: separate "집중" tab. When the timer ends, show a "집중 완료!" screen with the bonus and a "퀴즈 시작" button (no automatic quiz start); one tap starts a round in the selected subject, with the usual "need 4 concepts" message if needed.
 - Stage 3 shop prices: set so the first item is affordable after 2-3 rounds.
-- **"최근 기록" section** under the Quiz tab (planned Oct 29, not built yet): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
+- **"최근 기록" section** under the Quiz tab (built Oct 29): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
 
 **Stage 3 (core)**
 - Character customization: buy and equip colors, hats, face items with coins.
@@ -124,11 +124,22 @@ All code must be written from scratch in this repo. No templates, no reused code
 - Notes tab change passed the user's retest (including phone size in DevTools), committed and pushed (`ca7c7f2`): subject filter buttons (전체 + one per subject, choice remembered), "전체" view grouped by subject with collapsible headers "과목 (개수)" (collapsed state remembered), subject tag and "N번 틀림" badge kept. Pure helpers `groupBySubject`, `visibleGroups`, `normalizeFilter` in `concepts.js`.
 - Added the "최근 기록" plan to Stage 2 (see above).
 
-**Stage 1 is complete** (including subjects, bulk import, Korean UI, round rules with retry, Notes filter/groups). 67 Node tests pass (`node tests/logic.test.js`); manual checklist passed by the user. Live site: https://userhjpark.github.io/study-quest/ (the Pages build of the latest push should be re-checked on a phone).
+**Stage 1 is complete** (including subjects, bulk import, Korean UI, round rules with retry, Notes filter/groups).
 
-**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`. No README yet (due before submission; max 1,200 words, English, user's own voice).
+**Stage 2 is complete (Oct 29).** Built in six steps, each committed; steps 4 and 5 (UI) passed the user's manual tests:
+- `js/history.js`: round-result record + "최근 기록" (newest 10).
+- `js/rewards.js`: XP, levels (50*L*(L-1)), coins, daily XP cap 600, timer bonus (5 XP + 2 coins, max 3/day), daily check-in + streak, automatic check-in when a round or timer finishes (once per day in either order).
+- `js/timer.js`: timestamp-based focus timer (1/10/15/25 min); "집중" tab with a "집중 완료!" screen and a "퀴즈 시작" button; the page title and a dot on the tab show the state; "그만하기" asks for confirmation in an in-page dialog.
+- Header profile bar: level, XP bar, coins, streak, "오늘 N/600 XP", check-in button.
+- Leaving a running quiz round for either 노트 or 집중 shows the in-page leave dialog.
+- Tests: 119 Node tests pass (`node tests/logic.test.js`); manual checklist has a Stage 2 section. The "그만하기" confirm dialog was added right before the commit and has not been clicked through in a browser yet (retest it first thing next session).
+- New known limitations were added above (two tabs, XP only given when a round ends, coins not capped). Also: no sound or notification when the timer ends.
+
+Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 2 commits are not pushed yet).
+
+**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
 **Next (in order):**
-1. **Oct 29 (today):** Stage 2 must be finished today. Plan approved. Steps: (1) `history.js` round record + "최근 기록", (2) `rewards.js`, (3) check-in + streak, (4) profile bar + result screen [user tests], (5) `timer.js` + "집중" tab [user tests], (6) docs/checklist. Steps 1-3 are logic only: run the Node tests and commit without waiting; stop for the user's manual test after steps 4 and 5.
-2. **Oct 30:** Stage 3 (character shop). **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
+1. Push the Stage 2 commits and re-check the Pages build.
+2. **Oct 30:** Stage 3 (character shop: `character.js`; buy and equip colors, hats, face items with coins; set prices so the first item is affordable after 2-3 rounds, i.e. about 25-40 coins; plan and wait for approval first). **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
 3. After Stage 3: README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.

@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 const SEP_BY_NAME = { ":": ":", "/": "/", tab: "\t" };
 
 let pendingLeave = null;
+let pendingQuitFocus = null;
 
 export function bindEvents(h) {
   document.querySelectorAll(".tab").forEach((btn) => {
@@ -31,6 +32,24 @@ export function bindEvents(h) {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) h.onVisible();
   });
+
+  // Focus timer
+  document.querySelectorAll(".duration-btn").forEach((btn) => {
+    btn.addEventListener("click", () => h.onFocusStart(Number(btn.dataset.minutes)));
+  });
+  $("focus-cancel-btn").addEventListener("click", h.onFocusCancel);
+  // Quit dialog: "계속하기" (or Esc) just closes it; "그만하기" closes it and runs the saved action.
+  const quitDialog = $("quit-focus-dialog");
+  $("quit-focus-stay-btn").addEventListener("click", () => quitDialog.close());
+  $("quit-focus-confirm-btn").addEventListener("click", () => {
+    const action = pendingQuitFocus;
+    pendingQuitFocus = null;
+    quitDialog.close();
+    if (action) action();
+  });
+  quitDialog.addEventListener("close", () => { pendingQuitFocus = null; });
+  $("focus-quiz-btn").addEventListener("click", h.onFocusQuiz);
+  $("focus-back-btn").addEventListener("click", h.onFocusBack);
 
   // Quiz
   $("quiz-subject").addEventListener("change", () => h.onQuizSubject($("quiz-subject").value));
@@ -56,11 +75,23 @@ export function askLeave(onLeave) {
   $("leave-dialog").showModal();
 }
 
+export function askQuitFocus(onQuit) {
+  pendingQuitFocus = onQuit;
+  $("quit-focus-dialog").showModal();
+}
+
+// Closes the quit dialog without running its action (e.g. the timer finished meanwhile).
+export function closeQuitFocus() {
+  const dialog = $("quit-focus-dialog");
+  if (dialog.open) dialog.close();
+}
+
 export function showTab(name) {
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.tab === name);
   });
   $("tab-notes").hidden = name !== "notes";
+  $("tab-focus").hidden = name !== "focus";
   $("tab-quiz").hidden = name !== "quiz";
 }
 
@@ -437,4 +468,38 @@ export function renderProfile({ level, into, needed, coins, streak, canCheckIn, 
 
 export function setCheckInNote(message) {
   $("checkin-note").textContent = message || "";
+}
+
+/* ---------- Focus timer ---------- */
+
+const BASE_TITLE = document.title;
+
+// phase: "idle" (choose a length) | "running" | "done" (finished, bonus shown)
+export function showFocus(phase) {
+  $("focus-idle").hidden = phase !== "idle";
+  $("focus-running").hidden = phase !== "running";
+  $("focus-done").hidden = phase !== "done";
+  if (phase !== "running") document.title = BASE_TITLE;
+}
+
+// timeText is "MM:SS"; fraction is 0..1. The page title shows the time too, so it can be read
+// from another browser tab.
+export function renderTimer(timeText, fraction) {
+  const percent = Math.round(fraction * 100);
+  $("focus-time").textContent = timeText;
+  $("focus-fill").style.width = `${percent}%`;
+  $("focus-bar").setAttribute("aria-valuenow", String(percent));
+  document.title = `${timeText} · ${BASE_TITLE}`;
+}
+
+export function showTimerDone({ reward, subjectLabel }) {
+  $("focus-reward").textContent = reward.text;
+  $("focus-reward").classList.toggle("is-capped", reward.capped);
+  $("focus-checkin").textContent = reward.checkInText;
+  $("focus-subject").textContent = `퀴즈 과목: ${subjectLabel} (바꾸려면 퀴즈 탭에서 고르세요)`;
+}
+
+// Dot on the "집중" tab while a finished timer is waiting to be seen.
+export function setFocusAlert(on) {
+  document.querySelector('.tab[data-tab="focus"]').classList.toggle("has-alert", on);
 }

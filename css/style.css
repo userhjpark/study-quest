@@ -346,3 +346,12 @@ details.card summary {
 .result-reward { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--good-bg); color: var(--good); font-weight: 600; }
 .result-reward:empty { display: none; }
 .result-reward.is-capped { background: var(--bad-bg); color: var(--bad); }
+
+/* Focus timer (집중 tab) */
+.focus-time { font-size: 3.4rem; font-weight: 800; font-variant-numeric: tabular-nums; margin: 4px 0 12px; color: var(--primary-dark); }
+.focus-bar { background: var(--border); margin-bottom: 12px; }
+.focus-bar .xp-fill { background: var(--primary); }
+.duration-btn { flex: 1 1 40%; min-height: var(--tap); }
+/* A dot on the tab when a finished timer is waiting */
+.tab.has-alert::after { content: " ●"; color: #ffd95a; }
+.tab.is-active.has-alert::after { color: var(--primary); }

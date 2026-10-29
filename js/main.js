@@ -11,8 +11,9 @@ import {
 } from "./quiz.js";
 import {
   DAILY_XP_CAP, sanitizeProfile, levelForXp, levelProgress, currentStreak, canCheckIn, applyCheckIn,
-  applyRoundWithCheckIn, xpEarnedToday,
+  applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday,
 } from "./rewards.js";
+import { startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer } from "./timer.js";
 import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import * as ui from "./ui.js";
@@ -30,6 +31,19 @@ function freshRun() {
     step: null, // what "next" does after this answer: "next" | "retry" | "results"
     missedIds: [], // concepts answered wrong in the main part, in order, no duplicates
   };
+}
+
+function idleFocus() {
+  return {
+    phase: "idle", // "idle" = choose a length, "running", "done" = finished, bonus on screen
+    timer: null, // { startedAt, endAt, minutes } while running
+    reward: null, // what the "집중 완료!" screen shows
+  };
+}
+
+function loadFocus() {
+  const timer = sanitizeTimer(load("timer", null)); // a timer still running when the page was closed
+  return timer ? { ...idleFocus(), phase: "running", timer } : idleFocus();
 }
 
 function loadText(key, fallback) {
@@ -52,6 +66,7 @@ const state = {
   notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
   run: freshRun(),
+  focus: loadFocus(),
 };
 
 // Separator the user picked by hand in bulk import. null = auto-detect.
@@ -252,6 +267,111 @@ function rewardMessage(gained, checkIn, levelUp) {
   return { text, capped: gained.capped, checkInText };
 }
 
+/* ---------- Focus timer ---------- */
+
+let tickHandle = null; // setInterval id while a timer is running
+
+function subjectLabel() {
+  return scopeLabel() ?? "전체 과목";
+}
+
+// Shows whatever the focus state says. Also puts a dot on the tab if a finished timer is waiting.
+function refreshFocus() {
+  const { focus } = state;
+  ui.showFocus(focus.phase);
+  if (focus.phase === "running") showTimerNow();
+  if (focus.phase === "done") ui.showTimerDone({ reward: focus.reward, subjectLabel: subjectLabel() });
+  ui.setFocusAlert(focus.phase === "done" && state.tab !== "focus");
+}
+
+function showTimerNow() {
+  const { timer } = state.focus;
+  const now = Date.now();
+  ui.renderTimer(formatRemaining(remainingMs(timer, now)), progress(timer, now));
+}
+
+function stopTicking() {
+  if (tickHandle !== null) clearInterval(tickHandle);
+  tickHandle = null;
+}
+
+function startTicking() {
+  stopTicking();
+  tickHandle = setInterval(tickTimer, 1000);
+}
+
+// Runs every second and when the page becomes visible again. The time shown always comes from the
+// clock (timer.js), so a throttled background tab only delays this, it never makes the timer wrong.
+function tickTimer() {
+  const { focus } = state;
+  if (focus.phase !== "running") return;
+  if (isFinished(focus.timer, Date.now())) finishTimer();
+  else showTimerNow();
+}
+
+function handleFocusStart(minutes) {
+  if (state.focus.phase !== "idle") return;
+  state.focus = { ...idleFocus(), phase: "running", timer: startTimer(Date.now(), minutes) };
+  save("timer", state.focus.timer);
+  refreshFocus();
+  startTicking();
+}
+
+// "그만하기" asks first, so a stray tap cannot throw away a long session.
+function handleFocusCancel() {
+  if (state.focus.phase !== "running") return;
+  ui.askQuitFocus(quitFocus);
+}
+
+// Giving up: no bonus.
+function quitFocus() {
+  if (state.focus.phase !== "running") return; // it finished while the dialog was open
+  stopTicking();
+  state.focus = idleFocus();
+  save("timer", null);
+  refreshFocus();
+}
+
+// The timer ran out: small bonus (and today's check-in), then the "집중 완료!" screen.
+// The saved timer is removed first so a reload cannot give the bonus twice.
+function finishTimer() {
+  stopTicking();
+  ui.closeQuitFocus(); // the player may have the "그만하기" question open at this moment
+  save("timer", null);
+  const before = state.profile;
+  const result = applyTimerWithCheckIn(before, Date.now());
+  state.profile = result.profile;
+  save("profile", state.profile);
+
+  const reward = rewardMessage(result.gained, result.checkIn, levelUpText(before, state.profile));
+  if (!result.granted) {
+    reward.text = "오늘의 타이머 보너스(하루 3번)는 모두 받았어요. 퀴즈로 XP를 모아 보세요!";
+    reward.capped = false;
+  }
+  state.focus = { ...idleFocus(), phase: "done", reward };
+  refreshProfile();
+  refreshFocus();
+}
+
+function handleFocusBack() {
+  state.focus = idleFocus();
+  refreshFocus();
+}
+
+// One tap: go to the Quiz tab and start a round in the selected subject. If the subject has
+// fewer than 4 concepts the usual message is shown there instead.
+function handleFocusQuiz() {
+  state.focus = idleFocus();
+  refreshFocus();
+  handleTab("quiz");
+  handleStart();
+}
+
+function handleVisible() {
+  refreshProfile();
+  tickTimer();
+}
+
 /* ---------- Quiz ---------- */
 
 // The concepts the quiz uses: the chosen subject, or everything.
@@ -283,18 +403,16 @@ function leaveQuizThen(action) {
 function handleTab(name) {
   refreshProfile(); // the day may have changed since the page was opened
   if (name === state.tab) return;
-  if (name === "notes") {
-    leaveQuizThen(() => {
-      resetQuiz();
-      state.tab = "notes";
-      ui.showTab("notes");
-      refreshNotes(); // show updated "N번 틀림" badges
-    });
-  } else {
+  const enter = () => {
+    if (state.tab === "quiz") resetQuiz(); // leaving the quiz drops an unfinished round
     state.tab = name;
     ui.showTab(name);
-    resetQuiz();
-  }
+    if (name === "quiz") resetQuiz();
+    if (name === "notes") refreshNotes(); // show updated "N번 틀림" badges
+    refreshFocus(); // the dot on the 집중 tab, and the subject shown on the finish screen
+  };
+  if (state.tab === "quiz") leaveQuizThen(enter);
+  else enter();
 }
 
 function handleQuizSubject(value) {
@@ -410,7 +528,11 @@ function handleNext() {
 ui.bindEvents({
   onTab: handleTab,
   onCheckIn: handleCheckIn,
-  onVisible: refreshProfile,
+  onVisible: handleVisible,
+  onFocusStart: handleFocusStart,
+  onFocusCancel: handleFocusCancel,
+  onFocusQuiz: handleFocusQuiz,
+  onFocusBack: handleFocusBack,
   onAdd: handleAdd,
   onBulkChange: handleBulkChange,
   onBulkSeparator: handleBulkSeparator,
@@ -427,3 +549,8 @@ refreshBulk();
 ui.renderHistory(state.history);
 refreshProfile();
 resetQuiz();
+refreshFocus();
+if (state.focus.phase === "running") {
+  tickTimer(); // may already be over (page closed while it ran): then the finish screen shows
+  if (state.focus.phase === "running") startTicking();
+}
