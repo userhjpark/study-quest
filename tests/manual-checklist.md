@@ -163,6 +163,24 @@ Use the 1-minute option ("1분 (데모)") for most of these. Reload with Ctrl+Sh
 - [ ] Delete your own concept again (only samples left): the box comes back.
 - [ ] Bulk import counts as adding your own concepts (box disappears).
 
+## Stage 3: Character (캐릭터)
+
+Use a hard refresh (Ctrl+Shift+R). For a fresh start, clear the site data for this page.
+
+- [ ] **Gallery:** `http://localhost:8000/tests/avatar-gallery.html` shows the "?" placeholder, 4 animals, each animal with every item, and full outfits with each hat. Every item sits correctly on every animal; none looks like a known character.
+- [ ] **Fresh start:** the 캐릭터 tab has a yellow dot and the header shows a "?" avatar. Tapping the header avatar opens the 캐릭터 tab (the dot goes away while it is open).
+- [ ] **First pick:** the tab says "함께할 친구를 골라 주세요" with 4 animal cards marked "무료" and no shop chips. Tapping an animal shows it on the big picture; "이 친구로 시작하기 (무료)" appears. Leaving the tab and coming back resets the try-on.
+- [ ] Start with one animal: the title becomes "내 캐릭터", the header avatar shows the animal, the dot is gone, the shop with chips (동물 색상 모자 얼굴 소품) appears. A reload keeps it.
+- [ ] **Try-on:** tap an item you do not own (e.g. 민트). The big picture shows it, with "구매 (25코인)" and "원래대로". Coins, the header avatar and saved data do not change. Only one thing is tried at a time. "원래대로" goes back.
+- [ ] **Edge case, not enough coins:** with fewer coins than the price, tap "구매": the red message "코인이 N개 부족해요." appears, coins stay the same, nothing is bought, the try-on stays.
+- [ ] **Buying:** with enough coins, "구매" takes the price, puts the item on at once, shows "구매 완료!", updates the coin count in the header and in the shop, and the header avatar changes. A reload keeps everything.
+- [ ] **Slots:** buying a second hat replaces the first one. Tapping the first (owned) hat puts it back on without paying. Tapping a worn item takes it off (it stays owned).
+- [ ] **Animals:** a second animal costs 60 coins. After buying, switch between owned animals freely; worn items follow the animal. Colours change the fur; gold and the crown combine with other items.
+- [ ] Leaving the tab while trying something on removes the try-on; the header avatar never shows a try-on.
+- [ ] Earning coins while on the tab (the 출석 체크 button) updates the coin count in the shop.
+- [ ] **Broken data:** in the console run `localStorage.setItem("studyquest:character", '{"animal":"cat","ownedAnimals":[],"equipped":{"hat":"crown"}}')` and reload: the page still loads (no animal, nothing worn), not an error.
+- [ ] **Phone:** the four tabs fit on one row, the cards are easy to tap, nothing scrolls sideways, the header avatar does not squeeze the XP bar.
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.

@@ -59,11 +59,18 @@ All code must be written from scratch in this repo. No templates, no reused code
 - **Pause on "그만하기" (decision Oct 29, after the step 5 test):** tapping "그만하기" pauses the timer (the remaining time is saved) and opens the in-page dialog "집중을 그만할까요?". "계속하기" (or Esc) resumes from the remaining time with a NEW end time counted from now; "그만하기" in the dialog ends the timer with no bonus. *Why:* with a running timer, the time kept going down while the dialog was open, so "계속하기" lost time. A paused timer stores `pausedMs` instead of an end time, so it can never finish and a reload keeps it paused ("일시정지됨" with 계속하기 / 그만하기; the "그만하기" there asks again). The logic is in `timer.js` (`pauseTimer`, `resumeTimer`, `isPaused`) with tests.
 - **Tab order and default tab (decision Oct 29):** tabs are **집중 · 노트 · 퀴즈** and the page opens on **집중**. *Why:* the study flow is focus and study, review the notes, then test yourself with a quiz. Also, after a reload during a timer the app used to open on 노트 and the running timer looked like it had disappeared; opening on 집중 shows it.
 - **"내 개념을 추가해보세요" hint (decision Oct 29):** while the user has no concepts of their own (only the built-in samples, ids `s1`-`s10`; computed by `hasOwnConcepts` in `concepts.js`, so it comes back if they delete their own again), the **퀴즈** start screen shows a small box with a "노트 열기" button. It was first on the 집중 tab as well, but the user removed it there (**Oct 29**): a timer screen does not need it. *Why it exists:* the app opens on 집중, so a new user might never see the Notes tab and would only practice with the samples.
-- Stage 3 shop prices: set so the first item is affordable after 2-3 rounds.
+- Stage 3 shop prices: set so the first item is affordable after 2-3 rounds (see Stage 3 below for the final prices).
 - **"최근 기록" section** under the Quiz tab (built Oct 29): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
 
-**Stage 3 (core)**
+**Stage 3 (core, built Oct 30)**
 - Character customization: buy and equip colors, hats, face items with coins.
+- **Approved design (Oct 30):**
+  - 4 animals: 고양이, 강아지, 햄스터, 카피바라, drawn as original simple SVG shapes in code (`avatar-art.js`; no images, nothing resembling a known character). Items are drawn once and placed on each animal through shared anchor points (crown, eyes, cheeks, ears, body), so every item fits every animal.
+  - The first animal is free and is picked in the 4th tab **캐릭터** (a "?" avatar in the header and a dot on the tab until chosen; no popup). The other animals cost 60 coins and can be switched freely once owned. Colour items change the fur colour.
+  - Catalog (`character.js`): colours 민트 25 / 하늘 25 / 분홍 25 / 노랑 35 / 금색 120; hats 비니 30 / 야구 모자 40 / 연필 머리띠 35 / 마법사 모자 70 / 왕관 150; face 동그란 안경 30 / 선글라스 50 / 볼터치 25; props 헤드폰 50 / 책가방 45. The first item is affordable after about one round. One item per slot; a new one replaces the old one (연필 머리띠 is in the hat slot).
+  - **Try-on:** tapping something not owned shows it on the big picture (with what is worn) with "구매 (N코인)" and "원래대로". Only one thing is tried at a time; leaving the tab resets it; it never changes saved data or coins; the header avatar always shows what is really worn. Tapping something owned puts it on (or takes it off if it is on). Buying equips at once. Not enough coins: "코인이 N개 부족해요." and nothing changes.
+  - Saving: the character has its own key `studyquest:character`; coins stay in the profile. A purchase saves the character first and the coins second (worst case a free item, never a lost purchase). Broken saved data is repaired on load (`sanitizeCharacter`).
+  - Files: `character.js` (rules, pure), `avatar-art.js` (shape data, pure), `ui-character.js` (SVG drawing and the shop screen). `tests/avatar-gallery.html` shows every animal with every item (not linked from the app).
 
 **After Stage 3 (planned Oct 29, not built; only if time allows, before the README):**
 - A small **"오늘의 공부" card at the top of the 집중 tab** showing today's focus minutes, quiz rounds, accuracy, and streak, built from data we already save (`profile.daily.focusMinutes`, the "최근 기록" history, `profile.checkIn`). Note: the history keeps only the newest 10 rounds, so "today's rounds/accuracy" counts the rounds of today within those 10. Keep the calculation in a pure function with tests.
@@ -123,6 +130,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - If the site is open in two tabs at once, one tab can overwrite progress saved by the other, because each tab keeps its own copy in memory (seen on Oct 29: a finished round overwrote a value changed in the console without a reload). Use one tab at a time.
 - XP and coins are given when a round finishes; quitting midway gives nothing.
 - Coins are not limited by the daily cap (only XP is).
+- Purchases are not undoable and items cannot be sold; only the coin check protects the shop, and coins live in editable localStorage like everything else.
 - (Add more as they are discovered.)
 
 ## Future work to list in the README
@@ -130,6 +138,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - A daily study to-do list (not part of this project).
 - Stage 4 options that were not built (PDF import or the Firebase leaderboard), if one of them is dropped.
 - "오늘의 공부" card / 7-day focus chart, if not built.
+- More animals (돼지, 호랑이, 원숭이): the art system makes a new animal one more entry in `avatar-art.js` plus `character.js`, but it was not built.
 
 ## Status
 
@@ -157,11 +166,16 @@ All code must be written from scratch in this repo. No templates, no reused code
 - **After the Stage 2 commit (Oct 29):** pause-on-quit, the tab order 집중 · 노트 · 퀴즈 with 집중 as the default and the "내 개념을 추가해보세요" hint (passed the user's retest); then the custom timer length, the minute-based timer bonus with the 180-minute cap, and the quiz-subject dropdowns on the 집중 tab (see the decisions above). Waiting for the user's retest of these three before pushing.
 - New known limitations were added above (two tabs, XP only given when a round ends, coins not capped). Also: no sound or notification when the timer ends.
 
-Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 2 commits are NOT pushed yet).
+Live site: https://userhjpark.github.io/study-quest/ (re-check the Pages build of the latest push on a phone; the Stage 3 was pushed Oct 30).
 
-**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`. No README yet (due before submission; max 1,200 words, English, user's own voice).
+**Stage 3 is complete (Oct 30).** Built in five steps; the 캐릭터 tab passed the user's manual test and the gallery page was checked by the user:
+- `js/character.js` (rules), `js/avatar-art.js` (4 animals + 15 items as shape data), `js/ui-character.js` (renderer + shop screen), `tests/avatar-gallery.html`.
+- Header avatar, a dot on the 캐릭터 tab until the first friend is picked, first-pick screen, shop with category chips, try-on, buying, equipping.
+- Tests: 191 Node tests pass; manual checklist has a "Stage 3: Character" section.
+
+**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `js/character.js`, `js/avatar-art.js`, `js/ui-character.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`, `tests/avatar-gallery.html`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
 **Next (in order):**
 1. After the user's retest of the pause dialog, tab order and hint: push the Stage 2 commits and re-check the Pages build.
-2. **Oct 30:** Stage 3 (character shop: `character.js`; buy and equip colors, hats, face items with coins; set prices so the first item is affordable after 2-3 rounds, i.e. about 25-40 coins; plan and wait for approval first). **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
-3. After Stage 3: README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
+2. **Oct 30 evening:** decide Stage 4 (PDF import vs leaderboard), only if Stages 1-3 look on track.
+3. Optionally the "오늘의 공부" card (see above). Then README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
