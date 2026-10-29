@@ -36,6 +36,10 @@ import {
   notEnoughCoinsMessage,
 } from "../js/character.js";
 
+import {
+  VIEWBOX, ANCHORS, NATURAL_FUR, FUR_COLORS, shade, drawCharacter, hasArt, shapeBounds, shapePolygons,
+} from "../js/avatar-art.js";
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -1312,6 +1316,128 @@ test("sanitizeCharacter: an item worn in the wrong slot is taken off", () => {
   const r = sanitizeCharacter({ ownedItems: ["beanie"], equipped: { eyes: "beanie", hat: "beanie" } });
   assert.equal(r.equipped.eyes, null);
   assert.equal(r.equipped.hat, "beanie");
+});
+
+/* ---------- avatar-art.js: anchors, shapes, fit ---------- */
+
+const looks = (animal, equipped = {}) => ({
+  animal, equipped: { color: null, hat: null, eyes: null, cheek: null, ears: null, back: null, ...equipped },
+});
+const FULL_OUTFIT = { color: "mint", hat: "wizard", eyes: "sunglasses", cheek: "blush", ears: "headphones", back: "bag" };
+
+test("every animal has the same anchor points, in sensible places", () => {
+  assert.deepEqual(Object.keys(ANCHORS).sort(), ANIMALS.map((a) => a.id).sort());
+  for (const [name, a] of Object.entries(ANCHORS)) {
+    for (const key of ["crown", "headWidth", "eyeL", "eyeR", "cheekL", "cheekR", "earL", "earR", "body"]) {
+      assert.ok(key in a, `${name}.${key}`);
+    }
+    assert.ok(a.crown.y < a.eyeL.y, `${name}: the crown is above the eyes`);
+    assert.equal(a.eyeL.y, a.eyeR.y, `${name}: both eyes at the same height`);
+    assert.ok(a.eyeL.x < a.crown.x && a.crown.x < a.eyeR.x, `${name}: eyes left and right of the middle`);
+    assert.ok(a.eyeL.y < a.cheekL.y, `${name}: cheeks are below the eyes`);
+    assert.ok(a.earL.x < a.eyeL.x && a.eyeR.x < a.earR.x, `${name}: the ear points are at the sides of the head`);
+    assert.ok(a.crown.y < a.body.top && a.body.top < a.body.bottom, `${name}: body is below the head top`);
+    for (const point of [a.crown, a.eyeL, a.eyeR, a.cheekL, a.cheekR, a.earL, a.earR]) {
+      assert.ok(point.x >= 0 && point.x <= VIEWBOX && point.y >= 0 && point.y <= VIEWBOX, name);
+    }
+  }
+});
+test("anchors are symmetric around the middle of the face", () => {
+  for (const [name, a] of Object.entries(ANCHORS)) {
+    assert.equal(a.eyeL.x + a.eyeR.x, 2 * a.crown.x, `${name} eyes`);
+    assert.equal(a.cheekL.x + a.cheekR.x, 2 * a.crown.x, `${name} cheeks`);
+    assert.equal(a.earL.x + a.earR.x, 2 * a.crown.x, `${name} ears`);
+  }
+});
+test("every item in the shop has art (colours have a fur colour, the rest have drawing code)", () => {
+  for (const item of ITEMS) assert.equal(hasArt(item.id), true, item.id);
+  for (const item of ITEMS.filter((i) => i.category === "color")) assert.match(FUR_COLORS[item.id], /^#[0-9a-f]{6}$/);
+  assert.equal(hasArt("nope"), false);
+});
+test("shade mixes a colour with white or black", () => {
+  assert.equal(shade("#000000", 1), "#ffffff");
+  assert.equal(shade("#ffffff", -1), "#000000");
+  assert.equal(shade("#808080", 0), "#808080");
+  assert.equal(shade("#ff0000", 0.5), "#ff8080");
+  assert.equal(shade("#ff0000", -0.5), "#800000");
+});
+test("nothing is drawn until an animal is chosen", () => {
+  assert.deepEqual(drawCharacter({ animal: null, equipped: {} }), []);
+  assert.deepEqual(drawCharacter(freshCharacter()), []);
+  assert.deepEqual(drawCharacter({ animal: "dragon", equipped: {} }), []);
+});
+test("each animal draws its own shapes, sorted from back to front", () => {
+  const drawings = ANIMALS.map((a) => JSON.stringify(drawCharacter(looks(a.id))));
+  assert.equal(new Set(drawings).size, 4); // four different animals
+  for (const a of ANIMALS) {
+    const shapes = drawCharacter(looks(a.id, FULL_OUTFIT));
+    assert.ok(shapes.length > 20);
+    for (let i = 1; i < shapes.length; i++) assert.ok((shapes[i - 1].z ?? 0) <= (shapes[i].z ?? 0), a.id);
+  }
+});
+test("a colour item changes the fur colour, and the natural colour is used otherwise", () => {
+  const fills = (c) => new Set(drawCharacter(c).map((s) => s.fill));
+  assert.ok(fills(looks("cat")).has(NATURAL_FUR.cat));
+  assert.ok(!fills(looks("cat", { color: "mint" })).has(NATURAL_FUR.cat));
+  assert.ok(fills(looks("cat", { color: "mint" })).has(FUR_COLORS.mint));
+  assert.ok(fills(looks("capybara", { color: "gold" })).has(FUR_COLORS.gold));
+});
+test("every item changes the drawing, and takes it away again when removed", () => {
+  for (const a of ANIMALS) {
+    const plain = JSON.stringify(drawCharacter(looks(a.id)));
+    for (const item of ITEMS) {
+      const worn = JSON.stringify(drawCharacter(looks(a.id, { [item.slot]: item.id })));
+      assert.notEqual(worn, plain, `${a.id} + ${item.id}`);
+    }
+  }
+});
+test("hats and glasses are placed with the anchors: the hat is above the eyes, glasses sit on the eyes", () => {
+  for (const a of ANIMALS) {
+    const anchors = ANCHORS[a.id];
+    for (const hat of ["beanie", "cap", "wizard", "crown"]) {
+      const shapes = drawCharacter(looks(a.id, { hat })).filter((s) => s.z >= 69);
+      const bottom = Math.max(...shapes.map((s) => shapeBounds(s).maxY));
+      assert.ok(bottom < anchors.eyeL.y - 8, `${a.id} ${hat} stays above the eyes`);
+      const mid = shapes.map((s) => shapeBounds(s)).reduce((acc, b) => acc + (b.minX + b.maxX) / 2, 0) / shapes.length;
+      assert.ok(Math.abs(mid - anchors.crown.x) < 14, `${a.id} ${hat} is centred on the head`);
+    }
+    for (const eyes of ["glasses", "sunglasses"]) {
+      const shapes = drawCharacter(looks(a.id, { eyes })).filter((s) => s.z >= 55);
+      const lens = shapes.map((s) => shapeBounds(s)).filter((b) => b.minX < anchors.eyeL.x && b.maxX > anchors.eyeL.x);
+      assert.ok(lens.length > 0, `${a.id} ${eyes} covers the left eye`);
+      assert.ok(shapes.some((s) => { const b = shapeBounds(s); return b.minX < anchors.eyeR.x && b.maxX > anchors.eyeR.x; }));
+    }
+  }
+});
+test("nothing falls off the canvas: every animal with every single item and with a full outfit", () => {
+  const check = (character, label) => {
+    for (const shape of drawCharacter(character)) {
+      const b = shapeBounds(shape);
+      for (const v of Object.values(b)) assert.ok(Number.isFinite(v), `${label}: ${shape.t} has a number that is not finite`);
+      assert.ok(b.minX >= 0 && b.minY >= 0 && b.maxX <= VIEWBOX && b.maxY <= VIEWBOX,
+        `${label}: ${shape.t} at ${JSON.stringify(b)} is outside the ${VIEWBOX}px canvas`);
+    }
+  };
+  for (const a of ANIMALS) {
+    check(looks(a.id), a.id);
+    for (const item of ITEMS) check(looks(a.id, { [item.slot]: item.id }), `${a.id} + ${item.id}`);
+    for (const hat of ["beanie", "cap", "pencil", "wizard", "crown"]) check(looks(a.id, { ...FULL_OUTFIT, hat }), `${a.id} outfit ${hat}`);
+  }
+});
+test("shapes only use the kinds the renderer knows, and every shape has a way to be painted", () => {
+  const kinds = new Set(["ellipse", "circle", "rect", "poly", "path"]);
+  for (const a of ANIMALS) {
+    for (const shape of drawCharacter(looks(a.id, FULL_OUTFIT))) {
+      assert.ok(kinds.has(shape.t), shape.t);
+      assert.ok((shape.fill && shape.fill !== "none") || shape.stroke, `${a.id} ${shape.t} is invisible`);
+      assert.ok(shapePolygons(shape).length > 0);
+      if (shape.stroke) assert.ok(shape.sw > 0);
+    }
+  }
+});
+test("equipped items follow the animal: the same outfit fits all four", () => {
+  const sizes = ANIMALS.map((a) => drawCharacter(looks(a.id, FULL_OUTFIT)).length);
+  assert.ok(sizes.every((n) => n > 25));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
