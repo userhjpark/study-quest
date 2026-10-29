@@ -27,6 +27,7 @@ import {
 
 import {
   DURATIONS, startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer,
+  isPaused, pauseTimer, resumeTimer,
 } from "../js/timer.js";
 
 let passed = 0;
@@ -825,8 +826,9 @@ const MIN = 60_000;
 test("timer offers 1 (demo), 10, 15 and 25 minutes", () => {
   assert.deepEqual(DURATIONS, [1, 10, 15, 25]);
 });
-test("startTimer stores the end time (start + minutes)", () => {
-  assert.deepEqual(startTimer(T0, 25), { startedAt: T0, endAt: T0 + 25 * MIN, minutes: 25 });
+test("startTimer stores the end time (start + minutes) and is not paused", () => {
+  assert.deepEqual(startTimer(T0, 25), { minutes: 25, endAt: T0 + 25 * MIN, pausedMs: null });
+  assert.equal(isPaused(startTimer(T0, 25)), false);
 });
 test("remaining time is computed from the clock, not counted", () => {
   const t = startTimer(T0, 10);
@@ -863,15 +865,81 @@ test("formatRemaining shows MM:SS and rounds up to the next second", () => {
   assert.equal(formatRemaining(1), "00:01");
   assert.equal(formatRemaining(0), "00:00");
 });
-test("sanitizeTimer keeps a real timer and rejects broken or edited ones", () => {
+test("sanitizeTimer keeps a real running timer and rejects broken ones", () => {
   const t = startTimer(T0, 15);
   assert.deepEqual(sanitizeTimer(t), t);
   assert.equal(sanitizeTimer(null), null);
   assert.equal(sanitizeTimer("x"), null);
   assert.equal(sanitizeTimer({ ...t, minutes: 7 }), null); // not an offered length
-  assert.equal(sanitizeTimer({ ...t, endAt: t.endAt + 1 }), null); // length does not match minutes
-  assert.equal(sanitizeTimer({ ...t, startedAt: "now" }), null);
+  assert.equal(sanitizeTimer({ ...t, endAt: "soon" }), null);
   assert.equal(sanitizeTimer({ minutes: 10 }), null);
+  assert.equal(sanitizeTimer({ minutes: 10, endAt: null, pausedMs: null }), null);
+});
+
+/* ---------- timer.js: pause and resume ---------- */
+
+test("pause freezes the time left", () => {
+  const paused = pauseTimer(startTimer(T0, 10), T0 + 4 * MIN);
+  assert.equal(isPaused(paused), true);
+  assert.deepEqual(paused, { minutes: 10, endAt: null, pausedMs: 6 * MIN });
+  assert.equal(remainingMs(paused, T0 + 4 * MIN), 6 * MIN);
+  assert.equal(remainingMs(paused, T0 + 3 * 3600_000), 6 * MIN); // hours later: still 6 minutes
+});
+test("a paused timer never finishes, however long the page stays closed", () => {
+  const paused = pauseTimer(startTimer(T0, 1), T0 + 1000);
+  assert.equal(isFinished(paused, T0 + 1000), false);
+  assert.equal(isFinished(paused, T0 + 24 * 3600_000), false);
+  assert.equal(remainingMs(paused, T0 + 24 * 3600_000), MIN - 1000); // frozen
+  assert.ok(Math.abs(progress(paused, T0 + 24 * 3600_000) - 1000 / MIN) < 1e-9); // bar does not move
+});
+test("resume keeps the remaining time: a new end time counted from now", () => {
+  const paused = pauseTimer(startTimer(T0, 10), T0 + 4 * MIN); // 6 minutes left
+  const later = T0 + 30 * MIN; // paused for 26 minutes
+  const resumed = resumeTimer(paused, later);
+  assert.equal(isPaused(resumed), false);
+  assert.equal(resumed.endAt, later + 6 * MIN);
+  assert.equal(remainingMs(resumed, later), 6 * MIN);
+  assert.equal(isFinished(resumed, later + 6 * MIN - 1), false);
+  assert.equal(isFinished(resumed, later + 6 * MIN), true);
+});
+test("time spent paused is not counted: pause, resume, pause again", () => {
+  let t = startTimer(T0, 10);
+  t = pauseTimer(t, T0 + 2 * MIN); // 8 left
+  t = resumeTimer(t, T0 + 50 * MIN);
+  t = pauseTimer(t, T0 + 53 * MIN); // ran 3 more minutes -> 5 left
+  assert.equal(remainingMs(t, T0 + 99 * MIN), 5 * MIN);
+});
+test("pause/resume on the wrong state change nothing", () => {
+  const running = startTimer(T0, 10);
+  const paused = pauseTimer(running, T0 + MIN);
+  assert.equal(resumeTimer(running, T0 + MIN), running); // not paused: nothing to resume
+  assert.equal(pauseTimer(paused, T0 + 2 * MIN), paused); // pausing twice keeps the first frozen time
+  const over = startTimer(T0, 1);
+  assert.equal(pauseTimer(over, T0 + MIN), over); // too late to pause a finished timer
+  assert.equal(isFinished(pauseTimer(over, T0 + MIN), T0 + MIN), true);
+});
+test("pause does not mutate the timer it was given", () => {
+  const t = startTimer(T0, 10);
+  pauseTimer(t, T0 + MIN);
+  assert.deepEqual(t, { minutes: 10, endAt: T0 + 10 * MIN, pausedMs: null });
+});
+test("reload while paused: saved JSON comes back as the same paused timer", () => {
+  const paused = pauseTimer(startTimer(T0, 25), T0 + 10 * MIN); // 15 min left
+  const restored = sanitizeTimer(JSON.parse(JSON.stringify(paused)));
+  assert.deepEqual(restored, paused);
+  assert.equal(isPaused(restored), true);
+  assert.equal(remainingMs(restored, T0 + 5 * 3600_000), 15 * MIN);
+  assert.equal(isFinished(restored, T0 + 5 * 3600_000), false);
+});
+test("sanitizeTimer rejects broken paused timers", () => {
+  const ok = { minutes: 10, endAt: null, pausedMs: 5 * MIN };
+  assert.deepEqual(sanitizeTimer(ok), ok);
+  assert.equal(sanitizeTimer({ ...ok, pausedMs: 0 }), null); // would be "finished" while paused
+  assert.equal(sanitizeTimer({ ...ok, pausedMs: -5 }), null);
+  assert.equal(sanitizeTimer({ ...ok, pausedMs: 11 * MIN }), null); // more than the whole timer
+  assert.equal(sanitizeTimer({ ...ok, pausedMs: 1.5 }), null);
+  assert.equal(sanitizeTimer({ ...ok, pausedMs: "5" }), null);
+  assert.equal(sanitizeTimer({ ...ok, endAt: T0 }), null); // both set: ambiguous
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

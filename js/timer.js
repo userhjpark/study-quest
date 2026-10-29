@@ -1,23 +1,45 @@
-// Focus timer logic. Pure, no DOM. The timer stores its END TIME and the remaining time is always
-// computed from the clock, so it stays correct when a phone throttles a background tab (a counter
-// that is incremented once per second would fall behind).
+// Focus timer logic. Pure, no DOM. A running timer stores its END TIME and the remaining time is
+// always computed from the clock, so it stays correct when a phone throttles a background tab (a
+// counter that is incremented once per second would fall behind).
+//
+// A timer is { minutes, endAt, pausedMs }:
+//   running: endAt is a timestamp, pausedMs is null
+//   paused:  pausedMs is the time left (frozen), endAt is null -> the clock no longer matters,
+//            so a paused timer can never finish and survives a reload unchanged.
 
 export const DURATIONS = [1, 10, 15, 25]; // minutes; 1 is for demos
 const MINUTE = 60_000;
 
 export function startTimer(now, minutes) {
-  return { startedAt: now, endAt: now + minutes * MINUTE, minutes };
+  return { minutes, endAt: now + minutes * MINUTE, pausedMs: null };
+}
+
+export function isPaused(timer) {
+  return timer.pausedMs !== null;
 }
 
 // Milliseconds left, never below 0. Never above the full length either: if the device clock is set
-// backwards after starting, the timer does not get longer than it was.
+// backwards while running, the timer does not get longer than it was.
 export function remainingMs(timer, now) {
-  const total = timer.minutes * MINUTE;
-  return Math.max(0, Math.min(total, timer.endAt - now));
+  if (isPaused(timer)) return timer.pausedMs;
+  return Math.max(0, Math.min(timer.minutes * MINUTE, timer.endAt - now));
 }
 
+// A paused timer never finishes, however much time passes.
 export function isFinished(timer, now) {
-  return remainingMs(timer, now) === 0;
+  return !isPaused(timer) && remainingMs(timer, now) === 0;
+}
+
+// Freezes the time left. A timer that is already paused or already over is returned as it is.
+export function pauseTimer(timer, now) {
+  if (isPaused(timer) || isFinished(timer, now)) return timer;
+  return { minutes: timer.minutes, endAt: null, pausedMs: remainingMs(timer, now) };
+}
+
+// Continues from the frozen time left: a NEW end time, counted from `now`.
+export function resumeTimer(timer, now) {
+  if (!isPaused(timer)) return timer;
+  return { minutes: timer.minutes, endAt: now + timer.pausedMs, pausedMs: null };
 }
 
 // 0..1 for a progress bar.
@@ -32,12 +54,15 @@ export function formatRemaining(ms) {
   return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
 }
 
-// Saved data may be missing or edited: accept only a timer whose length matches its minutes.
+// Saved data may be missing or edited: accept only a well-formed running or paused timer.
 export function sanitizeTimer(raw) {
   if (raw === null || typeof raw !== "object") return null;
-  const { startedAt, endAt, minutes } = raw;
+  const { minutes, endAt, pausedMs } = raw;
   if (!DURATIONS.includes(minutes)) return null;
-  if (!Number.isFinite(startedAt) || !Number.isFinite(endAt)) return null;
-  if (endAt - startedAt !== minutes * MINUTE) return null;
-  return { startedAt, endAt, minutes };
+  if (Number.isFinite(endAt) && (pausedMs === null || pausedMs === undefined)) {
+    return { minutes, endAt, pausedMs: null };
+  }
+  const paused = Number.isInteger(pausedMs) && pausedMs >= 1 && pausedMs <= minutes * MINUTE;
+  if (paused && (endAt === null || endAt === undefined)) return { minutes, endAt: null, pausedMs };
+  return null;
 }
