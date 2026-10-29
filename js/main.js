@@ -9,6 +9,10 @@ import {
   canStartQuiz, pickOptions, recordAnswer, nextCombo, pointsForAnswer,
   buildRound, buildRetry, nextStep, progressLabel,
 } from "./quiz.js";
+import {
+  DAILY_XP_CAP, sanitizeProfile, levelForXp, levelProgress, currentStreak, canCheckIn, applyCheckIn,
+  applyRoundWithCheckIn, xpEarnedToday,
+} from "./rewards.js";
 import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import * as ui from "./ui.js";
@@ -43,6 +47,7 @@ const state = {
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
   missed: load("missed", {}),
   history: sanitizeHistory(load("history", [])), // newest 10 round records
+  profile: sanitizeProfile(load("profile", null)), // xp, coins, daily counters, check-in
   quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
   notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
@@ -194,6 +199,59 @@ function handleBulkAdd() {
   ui.setBulkStatus(message);
 }
 
+/* ---------- Profile ---------- */
+
+function refreshProfile() {
+  const { profile } = state;
+  const now = Date.now();
+  ui.renderProfile({
+    ...levelProgress(profile.xp),
+    coins: profile.coins,
+    streak: currentStreak(profile, now),
+    canCheckIn: canCheckIn(profile, now),
+    todayXp: xpEarnedToday(profile, now),
+    dailyCap: DAILY_XP_CAP,
+  });
+  if (canCheckIn(profile, now)) ui.setCheckInNote(""); // a new day: drop yesterday's message
+}
+
+function levelUpText(before, after) {
+  const from = levelForXp(before.xp);
+  const to = levelForXp(after.xp);
+  return to > from ? ` 레벨 업! Lv ${to}` : "";
+}
+
+function handleCheckIn() {
+  const before = state.profile;
+  const result = applyCheckIn(before, Date.now());
+  if (!result.granted) return;
+  state.profile = result.profile;
+  save("profile", state.profile);
+  const { gained } = result;
+  ui.setCheckInNote(
+    `출석 완료! 연속 ${gained.streak}일 · +${gained.xp} XP, +${gained.coins} 코인${levelUpText(before, state.profile)}`
+  );
+  refreshProfile();
+}
+
+// What the result screen says about the reward for the finished round. `checkIn` is the automatic
+// check-in done by finishing the round (granted only if today's check-in was still open).
+function rewardMessage(gained, checkIn, levelUp) {
+  const checkInText = checkIn.granted
+    ? `출석 체크 완료! 연속 ${checkIn.gained.streak}일 · +${checkIn.gained.xp} XP, +${checkIn.gained.coins} 코인`
+    : "";
+  if (gained.xp === 0 && gained.capped) {
+    return {
+      text: `오늘의 XP 한도(${DAILY_XP_CAP})에 도달했어요. XP는 내일부터 다시 받아요. 코인 +${gained.coins}은 받았어요.${levelUp}`,
+      capped: true,
+      checkInText,
+    };
+  }
+  let text = `+${gained.xp} XP, +${gained.coins} 코인${levelUp}`;
+  if (gained.capped) text += ` (오늘의 XP 한도 ${DAILY_XP_CAP}에 도달해서 일부만 받았어요)`;
+  return { text, capped: gained.capped, checkInText };
+}
+
 /* ---------- Quiz ---------- */
 
 // The concepts the quiz uses: the chosen subject, or everything.
@@ -223,6 +281,7 @@ function leaveQuizThen(action) {
 }
 
 function handleTab(name) {
+  refreshProfile(); // the day may have changed since the page was opened
   if (name === state.tab) return;
   if (name === "notes") {
     leaveQuizThen(() => {
@@ -321,9 +380,16 @@ function showResults() {
   state.history = addRecord(state.history, record);
   save("history", state.history);
   ui.renderHistory(state.history);
+
+  const before = state.profile;
+  const reward = applyRoundWithCheckIn(before, record, record.finishedAt);
+  state.profile = reward.profile;
+  save("profile", state.profile);
+  refreshProfile();
+
   run.active = false;
   ui.setQuizSubjectEnabled(true);
-  ui.showResult(record);
+  ui.showResult(record, rewardMessage(reward.gained, reward.checkIn, levelUpText(before, state.profile)));
 }
 
 function handleNext() {
@@ -343,6 +409,8 @@ function handleNext() {
 
 ui.bindEvents({
   onTab: handleTab,
+  onCheckIn: handleCheckIn,
+  onVisible: refreshProfile,
   onAdd: handleAdd,
   onBulkChange: handleBulkChange,
   onBulkSeparator: handleBulkSeparator,
@@ -357,4 +425,5 @@ refreshNotes();
 refreshSubjects();
 refreshBulk();
 ui.renderHistory(state.history);
+refreshProfile();
 resetQuiz();

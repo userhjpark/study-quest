@@ -74,6 +74,28 @@ The UI is in Korean.
 - [ ] On the start screen or result screen, switching to 노트 shows no dialog.
 - [ ] The chosen quiz subject is remembered after reload.
 
+## Stage 2: Profile bar, rewards, recent rounds (최근 기록)
+
+Use clean data for the first items (private window or "Clear site data").
+
+- [ ] Header (under "Study Quest") shows "Lv 1", an XP bar with "0/100 XP", "코인 0", "연속 0일", "오늘 0/600 XP" and a "출석 체크" button.
+- [ ] **Button check-in:** tap "출석 체크": the note says "출석 완료! 연속 1일 · +10 XP, +6 코인", the button becomes the disabled "출석 완료", coins 6, XP 10. After a reload it stays disabled. The "오늘" line stays at 0 (check-in XP is outside the daily cap).
+- [ ] **Automatic check-in:** with clean data (button NOT pressed), finish a quiz round. The result screen shows the reward line ("+N XP, +N 코인") and a second line "출석 체크 완료! 연속 1일 · +10 XP, +6 코인". The header button now says "출석 완료".
+- [ ] **No double bonus (button first):** after pressing the button, finish a round: no "출석 체크 완료" line on the result screen, and XP/coins grow only by the round's reward.
+- [ ] **No double bonus (round first):** after the automatic check-in, the button is already "출석 완료" and cannot be pressed again. A second round the same day shows no check-in line.
+- [ ] Result screen reward: XP equals the round's points; coins = correct answers (+5 if every answer was correct). A correct answer in the retry part (다시 풀기) changes nothing.
+- [ ] Quitting a round midway ("퀴즈 종료" > "나가기") gives no XP or coins and adds nothing to "최근 기록".
+- [ ] The "오늘 N/600 XP" line goes up after each round by the XP gained.
+- [ ] **Level up:** after passing 100 XP the result screen says "레벨 업! Lv 2" and the header shows Lv 2 with the bar restarted.
+- [ ] **Edge case, daily cap:** in the DevTools console run
+      `localStorage.setItem("studyquest:profile", JSON.stringify({xp:0,coins:0,daily:{date:new Date().toLocaleDateString("sv"),xp:590,timerBonuses:0},checkIn:{last:"",streak:0}}))`
+      then **reload**. The header says "오늘 590/600 XP". The next round gives at most 10 XP and says the cap was reached ("일부만 받았어요"); the line then shows "오늘 600/600 XP · 한도 도달" (highlighted). A round after that gives 0 XP, still gives coins, and shows the red cap notice.
+- [ ] **Streak:** console: `localStorage.setItem("studyquest:profile", JSON.stringify({xp:0,coins:0,daily:{date:"",xp:0,timerBonuses:0},checkIn:{last:new Date(Date.now()-864e5).toLocaleDateString("sv"),streak:3}}))` and reload. The header shows "연속 3일" and the button is enabled; check-in (or a round) says "연속 4일".
+- [ ] Same with `last` set 2 days ago: the header shows "연속 0일" and check-in says "연속 1일".
+- [ ] **최근 기록** (bottom of the Quiz tab): a new item per finished round (newest first) with date/time, subject, score, "N문제 중 M문제 정답" and "틀린 개념: …" (omitted if none). Only the newest 10 are kept. It is still there after a reload.
+- [ ] A concept deleted after the round still shows in the history's missed list.
+- [ ] **Known limitation (two tabs):** with the site open in two tabs, a finished round in one tab can overwrite progress saved by the other tab. Reload before testing after editing localStorage in the console.
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.

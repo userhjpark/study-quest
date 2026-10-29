@@ -319,3 +319,30 @@ details.card summary {
 .history-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .history-detail, .history-missed { margin: 2px 0 0; font-size: 0.95rem; }
 .history-missed { color: var(--bad); }
+
+/* Profile bar (level, XP, coins, streak, check-in) */
+.profile { margin-bottom: 10px; }
+.profile-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.profile-row > span { white-space: nowrap; }
+.profile-small { font-size: 0.85rem; white-space: nowrap; }
+.xp-bar { flex: 1; height: 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.3); overflow: hidden; }
+.xp-fill { height: 100%; width: 0; border-radius: 6px; background: #ffd95a; transition: width 0.3s; }
+.checkin-btn {
+  margin-left: auto;
+  min-height: var(--tap);
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffd95a;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.checkin-btn:disabled { background: rgba(255, 255, 255, 0.25); color: #fff; cursor: default; }
+.profile-today { margin: 0 0 4px; font-size: 0.85rem; }
+.profile-today.is-full { font-weight: 700; color: #ffd95a; }
+.profile-note { margin: 0 0 6px; min-height: 1.4em; font-size: 0.9rem; font-weight: 600; }
+.result-reward { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--good-bg); color: var(--good); font-weight: 600; }
+.result-reward:empty { display: none; }
+.result-reward.is-capped { background: var(--bad-bg); color: var(--bad); }

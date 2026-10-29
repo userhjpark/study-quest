@@ -46,7 +46,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - XP, levels, coins. Daily check-in and streak bonus.
 - XP and coins come mainly from correct quiz answers. Finishing the timer gives only a small bonus, so leaving the timer running cannot be farmed for XP.
 - Daily XP cap (limits leaderboard cheating).
-- **Approved numbers (Oct 29)**: XP per round = main-part score (10 per correct + combo bonus); coins = 1 per correct answer + 5 for a perfect round; daily XP cap **600** (a perfect round with combos is almost 200 XP, so 300 would block after 2 rounds); timer bonus 5 XP + 2 coins per finished timer, at most 3 per day, nothing if quit early; level L needs 50*L*(L-1) total XP; check-in 10 XP + 5 coins + 1 coin per streak day (max +7), check-in XP is outside the cap; a missed day resets the streak to 1.
+- **Approved numbers (Oct 29)**: XP per round = main-part score (10 per correct + combo bonus); coins = 1 per correct answer + 5 for a perfect round; daily XP cap **600** (a perfect round with combos is almost 200 XP, so 300 would block after 2 rounds); timer bonus 5 XP + 2 coins per finished timer, at most 3 per day, nothing if quit early; level L needs 50*L*(L-1) total XP; check-in 10 XP + 5 coins + 1 coin per streak day (max +7), check-in XP is outside the cap; **finishing a quiz round or a focus timer also does today's check-in automatically** (bonus only once per day, whichever way it happens; shown on the result screen); the profile bar also shows "오늘 N/600 XP"; a missed day resets the streak to 1.
 - **Timer UI**: separate "집중" tab. When the timer ends, show a "집중 완료!" screen with the bonus and a "퀴즈 시작" button (no automatic quiz start); one tap starts a round in the selected subject, with the usual "need 4 concepts" message if needed.
 - Stage 3 shop prices: set so the first item is affordable after 2-3 rounds.
 - **"최근 기록" section** under the Quiz tab (planned Oct 29, not built yet): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
@@ -105,6 +105,9 @@ All code must be written from scratch in this repo. No templates, no reused code
 - localStorage-based XP cap, coins, and streaks can be bypassed by editing browser data or changing the device clock. Only Stage 4 server-side rules can limit this, and even they can only bound score jumps.
 - Data lives per browser/device; clearing site data erases progress.
 - Subjects cannot be renamed or deleted; a subject exists as long as it has concepts.
+- If the site is open in two tabs at once, one tab can overwrite progress saved by the other, because each tab keeps its own copy in memory (seen on Oct 29: a finished round overwrote a value changed in the console without a reload). Use one tab at a time.
+- XP and coins are given when a round finishes; quitting midway gives nothing.
+- Coins are not limited by the daily cap (only XP is).
 - (Add more as they are discovered.)
 
 ## Status

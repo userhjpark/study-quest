@@ -22,6 +22,7 @@ import {
   freshProfile, sanitizeProfile, dateKey, xpForLevel, levelForXp, levelProgress,
   rewardsForRound, applyRound, applyTimerBonus, xpLeftToday,
   CHECKIN_XP, applyCheckIn, canCheckIn, currentStreak,
+  xpEarnedToday, applyRoundWithCheckIn, applyTimerWithCheckIn,
 } from "../js/rewards.js";
 
 let passed = 0;
@@ -740,6 +741,76 @@ test("sanitizeProfile: a broken check-in date means 'never checked in'", () => {
   assert.equal(canCheckIn(p, at(29)), true);
   assert.equal(currentStreak(p, at(29)), 0);
   assert.equal(applyCheckIn(p, at(29)).gained.streak, 1);
+});
+
+/* ---------- rewards.js: automatic check-in, "오늘 N/600 XP" ---------- */
+
+test("finishing a round does today's check-in automatically (once)", () => {
+  const r = applyRoundWithCheckIn(freshProfile(), roundRec({ score: 85, correct: 8 }), at(29));
+  assert.equal(r.checkIn.granted, true);
+  assert.deepEqual(r.checkIn.gained, { xp: CHECKIN_XP, coins: 6, streak: 1 });
+  assert.deepEqual(r.gained, { xp: 85, coins: 8, capped: false }); // the round's own reward
+  assert.equal(r.profile.xp, 85 + CHECKIN_XP);
+  assert.equal(r.profile.coins, 8 + 6);
+  assert.deepEqual(r.profile.checkIn, { last: dateKey(at(29)), streak: 1 });
+  assert.equal(canCheckIn(r.profile, at(29)), false); // the button would now say "출석 완료"
+});
+test("a second round the same day gives no second check-in bonus", () => {
+  const first = applyRoundWithCheckIn(freshProfile(), roundRec(), at(29, 9));
+  const second = applyRoundWithCheckIn(first.profile, roundRec({ score: 50, correct: 5 }), at(29, 20));
+  assert.equal(second.checkIn.granted, false);
+  assert.equal(second.profile.xp, first.profile.xp + 50);
+  assert.equal(second.profile.checkIn.streak, 1);
+});
+test("button first, then a round: no double check-in bonus", () => {
+  const button = applyCheckIn(freshProfile(), at(29, 8));
+  const r = applyRoundWithCheckIn(button.profile, roundRec({ score: 100, correct: 10 }), at(29, 9));
+  assert.equal(r.checkIn.granted, false);
+  assert.equal(r.profile.xp, CHECKIN_XP + 100); // check-in once + the round only
+  assert.equal(r.profile.coins, 6 + 15);
+});
+test("round first, then the button: no double check-in bonus", () => {
+  const round = applyRoundWithCheckIn(freshProfile(), roundRec({ score: 100, correct: 10 }), at(29, 8));
+  const button = applyCheckIn(round.profile, at(29, 9));
+  assert.equal(button.granted, false);
+  assert.deepEqual(button.profile, round.profile);
+});
+test("auto check-in continues the streak on the next day", () => {
+  const day1 = applyRoundWithCheckIn(freshProfile(), roundRec(), at(1)).profile;
+  const day2 = applyRoundWithCheckIn(day1, roundRec(), at(2));
+  assert.equal(day2.checkIn.gained.streak, 2);
+  assert.equal(applyRoundWithCheckIn(day2.profile, roundRec(), at(4)).checkIn.gained.streak, 1); // gap
+});
+test("auto check-in XP stays outside the daily cap, the round XP is still capped", () => {
+  const r = applyRoundWithCheckIn(freshProfile(), roundRec({ score: DAILY_XP_CAP + 100 }), at(29));
+  assert.equal(r.gained.xp, DAILY_XP_CAP);
+  assert.equal(r.gained.capped, true);
+  assert.equal(r.profile.xp, DAILY_XP_CAP + CHECKIN_XP);
+  assert.equal(xpEarnedToday(r.profile, at(29)), DAILY_XP_CAP);
+});
+test("finishing a focus timer also checks in, and still limits the timer bonus", () => {
+  const r = applyTimerWithCheckIn(freshProfile(), at(29));
+  assert.equal(r.checkIn.granted, true);
+  assert.equal(r.granted, true);
+  assert.equal(r.profile.xp, TIMER_BONUS_XP + CHECKIN_XP);
+  let profile = r.profile;
+  for (let i = 1; i < TIMER_BONUS_MAX_PER_DAY; i++) profile = applyTimerWithCheckIn(profile, at(29)).profile;
+  const extra = applyTimerWithCheckIn(profile, at(29));
+  assert.equal(extra.granted, false); // bonus used up
+  assert.equal(extra.checkIn.granted, false); // and no second check-in
+});
+test("edge case: with the clock set backwards a round still pays, but gives no check-in", () => {
+  const p = applyCheckIn(freshProfile(), at(10)).profile;
+  const r = applyRoundWithCheckIn(p, roundRec({ score: 60, correct: 6 }), at(9));
+  assert.equal(r.checkIn.granted, false);
+  assert.equal(r.profile.xp, CHECKIN_XP + 60);
+});
+test("xpEarnedToday counts today's XP only and starts again on a new day", () => {
+  assert.equal(xpEarnedToday(freshProfile(), at(29)), 0);
+  const p = applyRound(freshProfile(), roundRec({ score: 590 }), at(29)).profile;
+  assert.equal(xpEarnedToday(p, at(29, 23)), 590);
+  assert.equal(xpEarnedToday(p, at(30, 1)), 0);
+  assert.equal(p.xp, 590); // total XP (the level bar) is a separate number
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

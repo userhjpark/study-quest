@@ -26,6 +26,12 @@ export function bindEvents(h) {
   });
   $("bulk-add-btn").addEventListener("click", h.onBulkAdd);
 
+  // Profile
+  $("checkin-btn").addEventListener("click", h.onCheckIn);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) h.onVisible();
+  });
+
   // Quiz
   $("quiz-subject").addEventListener("change", () => h.onQuizSubject($("quiz-subject").value));
   $("start-btn").addEventListener("click", h.onStart);
@@ -311,8 +317,12 @@ export function showQuizStart(canStart) {
   $("start-btn").disabled = !canStart;
 }
 
-export function showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect }) {
+export function showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect }, reward) {
   showQuizPart("result");
+  const rewardEl = $("result-reward");
+  rewardEl.textContent = reward.text;
+  rewardEl.classList.toggle("is-capped", reward.capped);
+  $("result-checkin").textContent = reward.checkInText;
   $("result-score").textContent = String(score);
   $("result-correct").textContent = `${total}문제 중 ${correct}문제 정답`;
   const retry = $("result-retry");
@@ -406,4 +416,25 @@ export function renderHistory(records) {
     }
     list.append(li);
   }
+}
+
+// Header profile bar. `canCheckIn` false = already checked in today.
+export function renderProfile({ level, into, needed, coins, streak, canCheckIn, todayXp, dailyCap }) {
+  const percent = Math.min(100, Math.round((into / needed) * 100));
+  $("profile-level").textContent = `Lv ${level}`;
+  $("xp-fill").style.width = `${percent}%`;
+  $("xp-bar").setAttribute("aria-valuenow", String(percent));
+  $("profile-xp").textContent = `${into}/${needed} XP`;
+  const today = $("profile-today");
+  today.textContent = `오늘 ${todayXp}/${dailyCap} XP` + (todayXp >= dailyCap ? " · 한도 도달" : "");
+  today.classList.toggle("is-full", todayXp >= dailyCap);
+  $("profile-coins").textContent = String(coins);
+  $("profile-streak").textContent = String(streak);
+  const btn = $("checkin-btn");
+  btn.disabled = !canCheckIn;
+  btn.textContent = canCheckIn ? "출석 체크" : "출석 완료";
+}
+
+export function setCheckInNote(message) {
+  $("checkin-note").textContent = message || "";
 }

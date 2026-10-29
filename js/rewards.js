@@ -75,6 +75,11 @@ function forToday(profile, now) {
   return { ...profile, daily: { date: today, xp: 0, timerBonuses: 0 } };
 }
 
+// XP counted against today's cap so far (for the "오늘 N/600 XP" line).
+export function xpEarnedToday(profile, now) {
+  return forToday(profile, now).daily.xp;
+}
+
 export function xpLeftToday(profile, now) {
   return Math.max(0, DAILY_XP_CAP - forToday(profile, now).daily.xp);
 }
@@ -178,4 +183,23 @@ export function applyCheckIn(profile, now) {
     gained: { xp: CHECKIN_XP, coins, streak },
     granted: true,
   };
+}
+
+/* ---------- Check-in as a side effect of playing ---------- */
+
+// Finishing a round or a focus timer counts as today's check-in, so forgetting the button costs
+// nothing. The check-in bonus is still given once a day, whichever way it happens: if the button
+// was used first, `checkIn.granted` is false here (and the other way round).
+function withCheckIn(profile, now, apply) {
+  const checkIn = applyCheckIn(profile, now);
+  const result = apply(checkIn.profile);
+  return { ...result, checkIn: { granted: checkIn.granted, gained: checkIn.gained } };
+}
+
+export function applyRoundWithCheckIn(profile, record, now) {
+  return withCheckIn(profile, now, (p) => applyRound(p, record, now));
+}
+
+export function applyTimerWithCheckIn(profile, now) {
+  return withCheckIn(profile, now, (p) => applyTimerBonus(p, now));
 }
