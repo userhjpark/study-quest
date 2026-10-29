@@ -117,6 +117,7 @@ export function showTab(name) {
   $("tab-notes").hidden = name !== "notes";
   $("tab-focus").hidden = name !== "focus";
   $("tab-quiz").hidden = name !== "quiz";
+  $("tab-character").hidden = name !== "character";
 }
 
 /* ---------- Notes ---------- */
@@ -547,4 +548,9 @@ export function showTimerDone({ reward }) {
 // Dot on the "집중" tab while a finished timer is waiting to be seen.
 export function setFocusAlert(on) {
   document.querySelector('.tab[data-tab="focus"]').classList.toggle("has-alert", on);
+}
+
+// Dot on the "캐릭터" tab until the first animal has been picked.
+export function setCharacterAlert(on) {
+  document.querySelector('.tab[data-tab="character"]').classList.toggle("has-alert", on);
 }

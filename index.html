@@ -11,6 +11,7 @@
     <h1>Study Quest</h1>
     <div class="profile" aria-label="내 정보">
       <div class="profile-row">
+        <button id="header-avatar" class="header-avatar" type="button" aria-label="내 캐릭터 열기"></button>
         <strong id="profile-level">Lv 1</strong>
         <div id="xp-bar" class="xp-bar" role="progressbar" aria-label="경험치" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="xp-fill" class="xp-fill"></div>
@@ -29,6 +30,7 @@
       <button class="tab is-active" data-tab="focus" type="button">집중</button>
       <button class="tab" data-tab="notes" type="button">노트</button>
       <button class="tab" data-tab="quiz" type="button">퀴즈</button>
+      <button class="tab" data-tab="character" type="button">캐릭터</button>
     </nav>
   </header>
 
@@ -183,6 +185,29 @@
         <h2>최근 기록</h2>
         <p id="history-empty" class="hint">아직 기록이 없어요. 퀴즈를 한 번 풀어 보세요!</p>
         <ul id="history-list" class="history-list"></ul>
+      </div>
+    </section>
+    <section id="tab-character" class="panel" hidden>
+      <div class="card">
+        <h2 id="char-title">내 캐릭터</h2>
+        <div id="char-preview" class="char-preview"></div>
+        <p id="char-caption" class="char-caption"></p>
+        <p id="char-message" class="char-message" role="status"></p>
+        <div id="char-first-actions" hidden>
+          <button id="char-start-btn" class="btn btn-primary" type="button">이 친구로 시작하기 (무료)</button>
+        </div>
+        <div id="char-try-actions" class="dialog-actions" hidden>
+          <button id="char-revert-btn" class="btn btn-secondary" type="button">원래대로</button>
+          <button id="char-buy-btn" class="btn btn-primary" type="button">구매</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 id="shop-title">상점</h2>
+        <p class="shop-coins">보유 코인 <strong id="char-coins">0</strong></p>
+        <div id="shop-categories" class="chips" role="group" aria-label="상점 분류"></div>
+        <div id="shop-grid" class="shop-grid"></div>
+        <p id="shop-hint" class="hint"></p>
       </div>
     </section>
   </main>

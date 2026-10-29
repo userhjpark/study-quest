@@ -128,6 +128,26 @@ export function unequipSlot(character, slot) {
   return { ...character, equipped: { ...character.equipped, [slot]: null } };
 }
 
+/* ---------- Shop list ---------- */
+
+// What the cards of a shop tab show: animals for "animal", otherwise the items of that category.
+export function shopEntries(category) {
+  return category === "animal" ? ANIMALS : ITEMS.filter((item) => item.category === category);
+}
+
+// "equipped" = on now (or the animal that is with the user), "owned" = bought but not on, "new" = not bought.
+export function shopStatus(character, id) {
+  if (isEquipped(character, id)) return "equipped";
+  return isOwned(character, id) ? "owned" : "new";
+}
+
+// Tapping something owned: put it on, or take it off if it is already on (the animal stays).
+export function wearOrTakeOff(character, id) {
+  const item = findItem(id);
+  if (item && isEquipped(character, id)) return unequipSlot(character, item.slot);
+  return equip(character, id);
+}
+
 /* ---------- Try-on ---------- */
 
 // The character as it would look with `id` on (an animal or an item the user may not own).

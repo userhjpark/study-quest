@@ -18,7 +18,11 @@ import {
 } from "./timer.js";
 import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
+import {
+  sanitizeCharacter, hasAnimal, isOwned, pickFirstAnimal, buy, wearOrTakeOff, findAnimal, findItem,
+} from "./character.js";
 import * as ui from "./ui.js";
+import * as charUi from "./ui-character.js";
 
 function freshRun() {
   return {
@@ -58,6 +62,15 @@ function loadCollapsed() {
   return new Set(Array.isArray(saved) ? saved.filter((s) => typeof s === "string") : []);
 }
 
+// What the 캐릭터 tab is showing right now. Not saved: leaving the tab resets it.
+function freshShop() {
+  return {
+    category: "color", // shop tab: animal | color | hat | face | prop
+    previewId: null, // animal/item being tried on (not owned yet), or null
+    message: "", good: null, // result of the last action; good true = green, false = red
+  };
+}
+
 const state = {
   tab: "focus", // the page opens on the timer (also shows a timer that was running before a reload)
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
@@ -69,6 +82,8 @@ const state = {
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
   run: freshRun(),
   focus: loadFocus(),
+  character: sanitizeCharacter(load("character", null)), // animal, what is owned, what is worn
+  shop: freshShop(),
 };
 
 // Separator the user picked by hand in bulk import. null = auto-detect.
@@ -230,6 +245,7 @@ function refreshProfile() {
     todayXp: xpEarnedToday(profile, now),
     dailyCap: DAILY_XP_CAP,
   });
+  charUi.setShopCoins(profile.coins);
   if (canCheckIn(profile, now)) ui.setCheckInNote(""); // a new day: drop yesterday's message
 }
 
@@ -268,6 +284,98 @@ function rewardMessage(gained, checkIn, levelUp) {
   let text = `+${gained.xp} XP, +${gained.coins} 코인${levelUp}`;
   if (gained.capped) text += ` (오늘의 XP 한도 ${DAILY_XP_CAP}에 도달해서 일부만 받았어요)`;
   return { text, capped: gained.capped, checkInText };
+}
+
+/* ---------- Character ---------- */
+
+function refreshCharacter() {
+  const { character, shop } = state;
+  charUi.renderHeaderAvatar(character);
+  charUi.renderCharacterTab({
+    character, coins: state.profile.coins, category: shop.category, previewId: shop.previewId,
+    message: shop.message, good: shop.good,
+  });
+  ui.setCharacterAlert(!hasAnimal(character) && state.tab !== "character"); // dot until a friend is picked
+}
+
+function setShopMessage(message, good) {
+  state.shop.message = message;
+  state.shop.good = good;
+}
+
+function resetShop() {
+  state.shop = { ...freshShop(), category: state.shop.category };
+}
+
+function saveCharacter() {
+  save("character", state.character);
+}
+
+function handleCharCategory(category) {
+  state.shop.category = category;
+  setShopMessage("", null);
+  refreshCharacter();
+}
+
+// Tapping a card: something owned is put on (or taken off if it is already on); something not
+// owned is only tried on the big picture. Nothing is bought or saved by trying.
+function handleCharPick(id) {
+  const { character } = state;
+  setShopMessage("", null);
+  if (isOwned(character, id)) {
+    state.character = wearOrTakeOff(character, id);
+    state.shop.previewId = null;
+    saveCharacter();
+  } else {
+    state.shop.previewId = id;
+  }
+  refreshCharacter();
+}
+
+function handleCharRevert() {
+  state.shop.previewId = null;
+  setShopMessage("", null);
+  refreshCharacter();
+}
+
+// The free first friend.
+function handleCharStart() {
+  const id = state.shop.previewId;
+  if (!id) return;
+  const result = pickFirstAnimal(state.character, id);
+  if (result.error) {
+    setShopMessage(result.error, false);
+    refreshCharacter();
+    return;
+  }
+  state.character = result.character;
+  state.shop.previewId = null;
+  saveCharacter();
+  const name = findAnimal(id).name;
+  setShopMessage(`${name}, 잘 부탁해요!`, true);
+  refreshCharacter();
+}
+
+// Buys what is being tried on. The character is saved first and the coins second: if saving stops
+// in between, the worst case is a free item, never a lost purchase.
+function handleCharBuy() {
+  const id = state.shop.previewId;
+  if (!id) return;
+  const result = buy(state.character, state.profile.coins, id);
+  if (result.error) {
+    setShopMessage(result.error, false); // the try-on stays so the user can see what was missing
+    refreshCharacter();
+    return;
+  }
+  state.character = result.character;
+  saveCharacter();
+  state.profile = { ...state.profile, coins: result.coins };
+  save("profile", state.profile);
+  state.shop.previewId = null;
+  const name = (findAnimal(id) ?? findItem(id)).name;
+  setShopMessage(`구매 완료! ${name}`, true);
+  refreshProfile();
+  refreshCharacter();
 }
 
 /* ---------- Focus timer ---------- */
@@ -457,11 +565,13 @@ function handleTab(name) {
   if (name === state.tab) return;
   const enter = () => {
     if (state.tab === "quiz") resetQuiz(); // leaving the quiz drops an unfinished round
+    if (state.tab === "character") resetShop(); // a try-on does not outlive the tab
     state.tab = name;
     ui.showTab(name);
     if (name === "quiz") resetQuiz();
     if (name === "notes") refreshNotes(); // show updated "N번 틀림" badges
     refreshFocus(); // the dot on the 집중 tab, and the subject shown on the finish screen
+    refreshCharacter(); // the tab content, and the dot on the 캐릭터 tab
   };
   if (state.tab === "quiz") leaveQuizThen(enter);
   else enter();
@@ -597,6 +707,14 @@ ui.bindEvents({
   onNext: handleNext,
   onEnd: () => leaveQuizThen(resetQuiz),
 });
+charUi.bindCharacterEvents({
+  onPick: handleCharPick,
+  onCategory: handleCharCategory,
+  onBuy: handleCharBuy,
+  onRevert: handleCharRevert,
+  onStart: handleCharStart,
+  onOpen: () => handleTab("character"),
+});
 ui.setSubjectInput(loadText("lastSubject", ""));
 refreshNotes();
 refreshSubjects();
@@ -605,6 +723,7 @@ ui.renderHistory(state.history);
 refreshProfile();
 resetQuiz();
 refreshFocus();
+refreshCharacter();
 if (state.focus.phase === "running") {
   tickTimer(); // may already be over (page closed while it ran): then the finish screen shows
   if (state.focus.phase === "running" && !isPaused(state.focus.timer)) startTicking();

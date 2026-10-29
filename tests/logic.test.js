@@ -34,6 +34,7 @@ import {
   ANIMAL_PRICE, ANIMALS, SLOTS, CATEGORIES, ITEMS, findAnimal, findItem, freshCharacter, hasAnimal,
   isOwned, isEquipped, pickFirstAnimal, buy, equip, unequipSlot, previewCharacter, sanitizeCharacter,
   notEnoughCoinsMessage,
+  shopEntries, shopStatus, wearOrTakeOff,
 } from "../js/character.js";
 
 import {
@@ -1438,6 +1439,41 @@ test("shapes only use the kinds the renderer knows, and every shape has a way to
 test("equipped items follow the animal: the same outfit fits all four", () => {
   const sizes = ANIMALS.map((a) => drawCharacter(looks(a.id, FULL_OUTFIT)).length);
   assert.ok(sizes.every((n) => n > 25));
+});
+
+/* ---------- character.js: shop list helpers ---------- */
+
+test("shop tabs list the right things: 4 animals, then items by category", () => {
+  assert.equal(shopEntries("animal").length, 4);
+  assert.deepEqual(shopEntries("color").map((i) => i.id), ["mint", "sky", "pink", "yellow", "gold"]);
+  assert.equal(shopEntries("hat").length, 5);
+  assert.deepEqual(shopEntries("face").map((i) => i.id), ["glasses", "sunglasses", "blush"]);
+  assert.deepEqual(shopEntries("prop").map((i) => i.id), ["headphones", "bag"]);
+  assert.equal(shopEntries("animal").length + ["color", "hat", "face", "prop"].reduce((n, c) => n + shopEntries(c).length, 0), 4 + ITEMS.length);
+});
+test("shop status: new, owned and equipped", () => {
+  let c = buy(withCat(), 500, "beanie").character;
+  assert.equal(shopStatus(c, "beanie"), "equipped");
+  assert.equal(shopStatus(c, "cap"), "new");
+  assert.equal(shopStatus(c, "cat"), "equipped");
+  assert.equal(shopStatus(c, "dog"), "new");
+  c = buy(c, 500, "cap").character; // the cap replaces the beanie
+  assert.equal(shopStatus(c, "beanie"), "owned");
+  assert.equal(shopStatus(c, "cap"), "equipped");
+});
+test("tapping an owned item puts it on, tapping a worn one takes it off", () => {
+  let c = buy(buy(withCat(), 500, "beanie").character, 500, "cap").character;
+  c = wearOrTakeOff(c, "beanie");
+  assert.equal(c.equipped.hat, "beanie");
+  c = wearOrTakeOff(c, "beanie");
+  assert.equal(c.equipped.hat, null);
+  assert.ok(isOwned(c, "beanie") && isOwned(c, "cap")); // taking off never loses it
+});
+test("tapping the animal in use does nothing; an owned other animal is switched to", () => {
+  const c = buy(withCat(), 500, "dog").character; // now the dog
+  assert.equal(wearOrTakeOff(c, "dog").animal, "dog");
+  assert.equal(wearOrTakeOff(c, "cat").animal, "cat");
+  assert.equal(wearOrTakeOff(c, "hamster").animal, "dog"); // not owned: nothing changes
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
