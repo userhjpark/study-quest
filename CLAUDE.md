@@ -65,6 +65,10 @@ All code must be written from scratch in this repo. No templates, no reused code
 **Stage 3 (core)**
 - Character customization: buy and equip colors, hats, face items with coins.
 
+**After Stage 3 (planned Oct 29, not built; only if time allows, before the README):**
+- A small **"오늘의 공부" card at the top of the 집중 tab** showing today's focus minutes, quiz rounds, accuracy, and streak, built from data we already save (`profile.daily.focusMinutes`, the "최근 기록" history, `profile.checkIn`). Note: the history keeps only the newest 10 rounds, so "today's rounds/accuracy" counts the rounds of today within those 10. Keep the calculation in a pure function with tests.
+- If time allows after that: a **7-day focus-minutes bar chart**. This needs a small per-day record (date -> focus minutes, last 7 days) that is not saved yet, because only today's minutes are kept now.
+
 **Stage 4 (optional)**: decide on **Oct 30 evening** between two options (choose one). If Stages 1-3 are not done by then, drop it and list it as a future feature in the README.
 
 *Option A: PDF import*
@@ -120,6 +124,12 @@ All code must be written from scratch in this repo. No templates, no reused code
 - XP and coins are given when a round finishes; quitting midway gives nothing.
 - Coins are not limited by the daily cap (only XP is).
 - (Add more as they are discovered.)
+
+## Future work to list in the README
+
+- A daily study to-do list (not part of this project).
+- Stage 4 options that were not built (PDF import or the Firebase leaderboard), if one of them is dropped.
+- "오늘의 공부" card / 7-day focus chart, if not built.
 
 ## Status
 
