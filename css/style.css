@@ -311,3 +311,11 @@ details.card summary {
 @media (min-width: 700px) {
   main { padding: 24px 16px; }
 }
+
+/* Recent rounds */
+.history-list { list-style: none; margin: 0; padding: 0; }
+.history-item { padding: 10px 0; border-top: 1px solid var(--border); }
+.history-item:first-child { border-top: 0; }
+.history-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.history-detail, .history-missed { margin: 2px 0 0; font-size: 0.95rem; }
+.history-missed { color: var(--bad); }

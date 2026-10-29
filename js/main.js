@@ -9,6 +9,7 @@ import {
   canStartQuiz, pickOptions, recordAnswer, nextCombo, pointsForAnswer,
   buildRound, buildRetry, nextStep, progressLabel,
 } from "./quiz.js";
+import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import * as ui from "./ui.js";
 
@@ -41,6 +42,7 @@ const state = {
   tab: "notes",
   concepts: sanitizeConcepts(load("concepts", null)) ?? SAMPLE_CONCEPTS,
   missed: load("missed", {}),
+  history: sanitizeHistory(load("history", [])), // newest 10 round records
   quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
   notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
@@ -312,14 +314,16 @@ function handleAnswer(pickedIndex) {
 }
 
 function showResults() {
-  const { score, correct, total, missedIds, retryTotal, retryCorrect } = state.run;
-  const missedTerms = missedIds
-    .map((id) => state.concepts.find((c) => c.id === id))
-    .filter(Boolean)
-    .map((c) => c.term);
-  state.run.active = false;
+  const { run } = state;
+  const record = buildRoundRecord({
+    run, concepts: state.concepts, subject: scopeLabel(), now: Date.now(),
+  });
+  state.history = addRecord(state.history, record);
+  save("history", state.history);
+  ui.renderHistory(state.history);
+  run.active = false;
   ui.setQuizSubjectEnabled(true);
-  ui.showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect });
+  ui.showResult(record);
 }
 
 function handleNext() {
@@ -352,4 +356,5 @@ ui.setSubjectInput(loadText("lastSubject", ""));
 refreshNotes();
 refreshSubjects();
 refreshBulk();
+ui.renderHistory(state.history);
 resetQuiz();

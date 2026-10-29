@@ -13,6 +13,10 @@ import {
   nextCombo, comboBonus, pointsForAnswer, shuffle, roundLength,
 } from "../js/quiz.js";
 
+import {
+  buildRoundRecord, addRecord, sanitizeHistory, HISTORY_LIMIT, ALL_SUBJECTS_LABEL,
+} from "../js/history.js";
+
 let passed = 0;
 let failed = 0;
 function test(name, fn) {
@@ -472,6 +476,57 @@ test("import end to end: preview rows saved with addMany", () => {
   assert.equal(r.added, 2);
   assert.equal(r.concepts.find((c) => c.term === "새것2").definition, "정의: 콜론 포함");
   assert.ok(r.concepts.every((c) => c.subject === "과목"));
+});
+
+/* ---------- history.js: round record and recent rounds ---------- */
+
+const runOf = (over = {}) => ({
+  score: 85, correct: 8, total: 10, retryCorrect: 1, retryTotal: 2, missedIds: ["a", "b"], ...over,
+});
+const recOf = (n) => buildRoundRecord({ run: runOf({ score: n }), concepts: [], subject: "S", now: n });
+
+test("round record has the planned fields and turns missed ids into text", () => {
+  const concepts = [mkIn("a", "광합성", "생명"), mkIn("b", "리보솜", "생명")];
+  const r = buildRoundRecord({ run: runOf(), concepts, subject: "생명", now: 1000 });
+  assert.deepEqual(r, {
+    finishedAt: 1000, subject: "생명", score: 85, correct: 8, total: 10,
+    retryCorrect: 1, retryTotal: 2, missedTerms: ["광합성", "리보솜"],
+  });
+});
+test("round record skips a missed id whose concept no longer exists (no crash)", () => {
+  const r = buildRoundRecord({ run: runOf(), concepts: [mkIn("a", "광합성", "생명")], subject: "생명", now: 1 });
+  assert.deepEqual(r.missedTerms, ["광합성"]); // "b" no longer exists: skipped, no crash
+});
+test("round record uses the all-subjects label when no subject is chosen", () => {
+  const r = buildRoundRecord({ run: runOf({ missedIds: [] }), concepts: [], subject: null, now: 1 });
+  assert.equal(r.subject, ALL_SUBJECTS_LABEL);
+  assert.deepEqual(r.missedTerms, []);
+});
+test("addRecord puts the newest first and keeps only the newest 10", () => {
+  let history = [];
+  for (let i = 1; i <= 12; i++) history = addRecord(history, recOf(i));
+  assert.equal(history.length, HISTORY_LIMIT);
+  assert.equal(history[0].finishedAt, 12);
+  assert.equal(history[9].finishedAt, 3);
+});
+test("addRecord does not change the list it was given", () => {
+  const before = [recOf(1)];
+  addRecord(before, recOf(2));
+  assert.equal(before.length, 1);
+});
+test("sanitizeHistory keeps valid records and drops broken ones", () => {
+  const good = recOf(5);
+  const list = [good, null, "x", { ...good, score: -3 }, { ...good, correct: 11 }, { ...good, finishedAt: "now" },
+    { ...good, missedTerms: "no" }];
+  assert.deepEqual(sanitizeHistory(list), [good]);
+});
+test("sanitizeHistory handles non-arrays, filters bad missed terms, caps the length", () => {
+  assert.deepEqual(sanitizeHistory(null), []);
+  assert.deepEqual(sanitizeHistory({}), []);
+  const r = sanitizeHistory([{ ...recOf(1), missedTerms: ["ok", 5, null] }]);
+  assert.deepEqual(r[0].missedTerms, ["ok"]);
+  const many = Array.from({ length: 15 }, (_, i) => recOf(i));
+  assert.equal(sanitizeHistory(many).length, HISTORY_LIMIT);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -367,3 +367,43 @@ export function showAnswerResult({ pickedIndex, correctIndex, message, good, nex
   $("next-btn").hidden = false;
   $("next-btn").focus();
 }
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+function formatWhen(timestamp) {
+  const d = new Date(timestamp);
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// "최근 기록": one item per finished round, newest first.
+export function renderHistory(records) {
+  $("history-empty").hidden = records.length > 0;
+  const list = $("history-list");
+  list.replaceChildren();
+  for (const r of records) {
+    const li = document.createElement("li");
+    li.className = "history-item";
+
+    const head = document.createElement("div");
+    head.className = "history-head";
+    const when = document.createElement("span");
+    when.className = "stat-label";
+    when.textContent = `${formatWhen(r.finishedAt)} · ${r.subject}`;
+    const score = document.createElement("strong");
+    score.textContent = `${r.score}점`;
+    head.append(when, score);
+
+    const detail = document.createElement("p");
+    detail.className = "history-detail";
+    detail.textContent = `${r.total}문제 중 ${r.correct}문제 정답`;
+    li.append(head, detail);
+
+    if (r.missedTerms.length > 0) {
+      const missed = document.createElement("p");
+      missed.className = "history-missed";
+      missed.textContent = "틀린 개념: " + r.missedTerms.join(", ");
+      li.append(missed);
+    }
+    list.append(li);
+  }
+}
