@@ -21,6 +21,7 @@ import {
   DAILY_XP_CAP, TIMER_BONUS_XP, TIMER_BONUS_COINS, TIMER_BONUS_MAX_PER_DAY,
   freshProfile, sanitizeProfile, dateKey, xpForLevel, levelForXp, levelProgress,
   rewardsForRound, applyRound, applyTimerBonus, xpLeftToday,
+  CHECKIN_XP, applyCheckIn, canCheckIn, currentStreak,
 } from "../js/rewards.js";
 
 let passed = 0;
@@ -649,10 +650,96 @@ test("leaving the timer running cannot be farmed: 3 bonuses are worth at most 15
 test("sanitizeProfile repairs missing, negative and non-number data", () => {
   assert.deepEqual(sanitizeProfile(null), freshProfile());
   assert.deepEqual(sanitizeProfile("x"), freshProfile());
-  const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, timerBonuses: 2.7 } });
-  assert.deepEqual(p, { xp: 0, coins: 0, daily: { date: "", xp: 0, timerBonuses: 2 } });
-  assert.deepEqual(sanitizeProfile({ xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 } }),
-    { xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 } });
+  const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, timerBonuses: 2.7 }, checkIn: 3 });
+  assert.deepEqual(p, { ...freshProfile(), daily: { date: "", xp: 0, timerBonuses: 2 } });
+  const saved = {
+    xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 },
+    checkIn: { last: "2026-10-29", streak: 4 },
+  };
+  assert.deepEqual(sanitizeProfile(saved), saved);
+});
+
+/* ---------- rewards.js: daily check-in and streak ---------- */
+
+test("first check-in: streak 1, 10 XP, 5 + 1 coins", () => {
+  const r = applyCheckIn(freshProfile(), at(29));
+  assert.equal(r.granted, true);
+  assert.deepEqual(r.gained, { xp: CHECKIN_XP, coins: 6, streak: 1 });
+  assert.equal(r.profile.xp, 10);
+  assert.equal(r.profile.coins, 6);
+  assert.deepEqual(r.profile.checkIn, { last: dateKey(at(29)), streak: 1 });
+});
+test("a second check-in on the same day is refused and changes nothing", () => {
+  const first = applyCheckIn(freshProfile(), at(29, 8)).profile;
+  assert.equal(canCheckIn(first, at(29, 23)), false);
+  const again = applyCheckIn(first, at(29, 23));
+  assert.equal(again.granted, false);
+  assert.deepEqual(again.profile, first);
+  assert.deepEqual(again.gained, { xp: 0, coins: 0, streak: 1 });
+});
+test("check-in on consecutive days grows the streak and the coin bonus", () => {
+  let profile = freshProfile();
+  const coins = [];
+  for (let day = 1; day <= 3; day++) {
+    const r = applyCheckIn(profile, at(day));
+    profile = r.profile;
+    coins.push(r.gained.coins);
+    assert.equal(r.gained.streak, day);
+  }
+  assert.deepEqual(coins, [6, 7, 8]);
+});
+test("the streak coin bonus stops at +7", () => {
+  let profile = freshProfile();
+  let last;
+  for (let day = 1; day <= 12; day++) {
+    last = applyCheckIn(profile, at(day));
+    profile = last.profile;
+  }
+  assert.equal(last.gained.streak, 12);
+  assert.equal(last.gained.coins, 5 + 7);
+});
+test("missing a day resets the streak to 1", () => {
+  const day1 = applyCheckIn(freshProfile(), at(1)).profile;
+  const day2 = applyCheckIn(day1, at(2)).profile;
+  const after = applyCheckIn(day2, at(4)); // skipped day 3
+  assert.equal(after.gained.streak, 1);
+  assert.equal(after.profile.checkIn.streak, 1);
+});
+test("streak works across a month change", () => {
+  const oct31 = new Date(2026, 9, 31, 12).getTime();
+  const nov1 = new Date(2026, 10, 1, 12).getTime();
+  const p = applyCheckIn(freshProfile(), oct31).profile;
+  assert.equal(applyCheckIn(p, nov1).gained.streak, 2);
+});
+test("currentStreak: counts today and yesterday, shows 0 once it is broken or never started", () => {
+  assert.equal(currentStreak(freshProfile(), at(29)), 0);
+  const p = applyCheckIn(applyCheckIn(freshProfile(), at(1)).profile, at(2)).profile;
+  assert.equal(currentStreak(p, at(2)), 2);
+  assert.equal(currentStreak(p, at(3)), 2); // not checked in yet today, still alive
+  assert.equal(currentStreak(p, at(4)), 0); // broken
+});
+test("edge case: device clock set backwards cannot check in again", () => {
+  const p = applyCheckIn(freshProfile(), at(10)).profile;
+  assert.equal(canCheckIn(p, at(9)), false);
+  const r = applyCheckIn(p, at(9));
+  assert.equal(r.granted, false);
+  assert.deepEqual(r.profile, p);
+  assert.equal(r.gained.streak, 1); // streak is not lost either
+});
+test("check-in XP is outside the daily cap and does not use it up", () => {
+  const capped = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP }), at(29)).profile;
+  const r = applyCheckIn(capped, at(29));
+  assert.equal(r.gained.xp, CHECKIN_XP); // still granted although today's cap is full
+  assert.equal(r.profile.xp, DAILY_XP_CAP + CHECKIN_XP);
+  assert.equal(r.profile.daily.xp, DAILY_XP_CAP); // the cap counter is unchanged
+  const fresh = applyCheckIn(freshProfile(), at(29)).profile;
+  assert.equal(xpLeftToday(fresh, at(29)), DAILY_XP_CAP);
+});
+test("sanitizeProfile: a broken check-in date means 'never checked in'", () => {
+  const p = sanitizeProfile({ checkIn: { last: "yesterday", streak: 9 } });
+  assert.equal(canCheckIn(p, at(29)), true);
+  assert.equal(currentStreak(p, at(29)), 0);
+  assert.equal(applyCheckIn(p, at(29)).gained.streak, 1);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

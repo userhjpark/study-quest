@@ -7,11 +7,14 @@ export const PERFECT_ROUND_COINS = 5;
 export const TIMER_BONUS_XP = 5;
 export const TIMER_BONUS_COINS = 2;
 export const TIMER_BONUS_MAX_PER_DAY = 3;
+export const CHECKIN_XP = 10;
+export const CHECKIN_COINS = 5;
+export const CHECKIN_STREAK_COINS_MAX = 7; // +1 coin per streak day, up to this many
 
 const MAX_STORED = 1_000_000_000; // keeps edited/broken saved numbers sane
 
 export function freshProfile() {
-  return { xp: 0, coins: 0, daily: { date: "", xp: 0, timerBonuses: 0 } };
+  return { xp: 0, coins: 0, daily: { date: "", xp: 0, timerBonuses: 0 }, checkIn: { last: "", streak: 0 } };
 }
 
 function count(value) {
@@ -22,6 +25,7 @@ function count(value) {
 export function sanitizeProfile(raw) {
   const p = raw !== null && typeof raw === "object" ? raw : {};
   const d = p.daily !== null && typeof p.daily === "object" ? p.daily : {};
+  const c = p.checkIn !== null && typeof p.checkIn === "object" ? p.checkIn : {};
   return {
     xp: count(p.xp),
     coins: count(p.coins),
@@ -30,6 +34,7 @@ export function sanitizeProfile(raw) {
       xp: count(d.xp),
       timerBonuses: count(d.timerBonuses),
     },
+    checkIn: { last: typeof c.last === "string" ? c.last : "", streak: count(c.streak) },
   };
 }
 
@@ -119,4 +124,58 @@ export function applyTimerBonus(profile, now) {
   const result = grant(today, now, TIMER_BONUS_XP, TIMER_BONUS_COINS);
   result.profile.daily.timerBonuses += 1;
   return { ...result, granted: true };
+}
+
+/* ---------- Daily check-in and streak ---------- */
+
+// Whole days from day key `a` to day key `b` ("YYYY-MM-DD"). UTC is used only for the counting,
+// so daylight-saving changes cannot shift the result.
+function daysBetween(a, b) {
+  const toDay = (key) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return Date.UTC(y, m - 1, d) / 86_400_000;
+  };
+  return toDay(b) - toDay(a);
+}
+
+function hasCheckedIn(checkIn) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(checkIn.last);
+}
+
+// Days in a row, as shown to the user: the streak counts while the last check-in was today or
+// yesterday. Anything older means it is broken (shown as 0 until the next check-in).
+export function currentStreak(profile, now) {
+  const { last, streak } = profile.checkIn;
+  if (!hasCheckedIn(profile.checkIn)) return 0;
+  const gap = daysBetween(last, dateKey(now));
+  return gap <= 1 ? streak : 0;
+}
+
+// One check-in per calendar day. If the saved last check-in is later than today the device clock
+// went backwards; that is treated as "already checked in", so setting the clock back cannot give
+// repeated check-ins.
+export function canCheckIn(profile, now) {
+  if (!hasCheckedIn(profile.checkIn)) return true;
+  return daysBetween(profile.checkIn.last, dateKey(now)) >= 1;
+}
+
+// Check-in gives CHECKIN_XP and coins (+1 coin per streak day). The XP is outside the daily cap.
+// Yesterday's check-in continues the streak; any longer gap starts again at 1.
+export function applyCheckIn(profile, now) {
+  if (!canCheckIn(profile, now)) {
+    return { profile, gained: { xp: 0, coins: 0, streak: currentStreak(profile, now) }, granted: false };
+  }
+  const gap = hasCheckedIn(profile.checkIn) ? daysBetween(profile.checkIn.last, dateKey(now)) : Infinity;
+  const streak = gap === 1 ? profile.checkIn.streak + 1 : 1;
+  const coins = CHECKIN_COINS + Math.min(streak, CHECKIN_STREAK_COINS_MAX);
+  return {
+    profile: {
+      ...profile,
+      xp: profile.xp + CHECKIN_XP,
+      coins: profile.coins + coins,
+      checkIn: { last: dateKey(now), streak },
+    },
+    gained: { xp: CHECKIN_XP, coins, streak },
+    granted: true,
+  };
 }
