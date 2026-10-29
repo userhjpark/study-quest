@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study Quest - 캐릭터 갤러리</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f1ff; color: #241f3a; }
+    h1 { font-size: 1.3rem; margin: 0 0 4px; }
+    h2 { font-size: 1.05rem; margin: 28px 0 8px; }
+    p { margin: 4px 0; color: #6b6785; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+    figure { margin: 0; padding: 8px 4px 6px; background: #fff; border-radius: 12px; text-align: center; box-shadow: 0 1px 4px rgba(36, 31, 58, 0.08); }
+    figure svg { width: 100%; height: auto; display: block; }
+    figcaption { font-size: 0.8rem; margin-top: 2px; }
+    .big { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  </style>
+</head>
+<body>
+  <h1>캐릭터 갤러리</h1>
+  <p>동물 4종과 모든 아이템을 한꺼번에 확인하는 점검용 페이지예요. 앱에는 연결되어 있지 않아요.</p>
+  <p>로컬 주소: <code>http://localhost:8000/tests/avatar-gallery.html</code> (저장소 폴더에서 <code>python3 -m http.server</code>)</p>
+  <div id="gallery"></div>
+
+  <script type="module">
+    import { ANIMALS, ITEMS, SLOTS } from "../js/character.js";
+    import { createAvatar } from "../js/ui-character.js";
+
+    const root = document.getElementById("gallery");
+    const empty = () => Object.fromEntries(SLOTS.map((slot) => [slot, null]));
+    const FULL = { color: "mint", hat: "wizard", eyes: "sunglasses", cheek: "blush", ears: "headphones", back: "bag" };
+
+    function section(title, note) {
+      const h = document.createElement("h2");
+      h.textContent = title;
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      root.append(h);
+      if (note) {
+        const p = document.createElement("p");
+        p.textContent = note;
+        root.append(p);
+      }
+      root.append(grid);
+      return grid;
+    }
+
+    function tile(grid, character, label) {
+      const figure = document.createElement("figure");
+      figure.append(createAvatar(character));
+      const caption = document.createElement("figcaption");
+      caption.textContent = label;
+      figure.append(caption);
+      grid.append(figure);
+    }
+
+    // 1. the animals as they are
+    const base = section("동물 (아무것도 입지 않음)");
+    tile(base, { animal: null, equipped: empty() }, "아직 고르지 않음 (?)");
+    for (const a of ANIMALS) tile(base, { animal: a.id, equipped: empty() }, a.name);
+
+    // 2. every item on every animal
+    for (const a of ANIMALS) {
+      const grid = section(`${a.name} + 아이템 하나씩`);
+      for (const item of ITEMS) tile(grid, { animal: a.id, equipped: { ...empty(), [item.slot]: item.id } }, item.name);
+    }
+
+    // 3. full outfits: all slots at once, with each hat
+    const outfits = section("전부 입히기", "색상 민트 + 선글라스 + 볼터치 + 헤드폰 + 책가방, 모자만 바꿔 가며");
+    for (const a of ANIMALS) {
+      for (const hat of ITEMS.filter((i) => i.slot === "hat")) {
+        tile(outfits, { animal: a.id, equipped: { ...FULL, hat: hat.id } }, `${a.name} · ${hat.name}`);
+      }
+    }
+  </script>
+</body>
+</html>
