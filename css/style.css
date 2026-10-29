@@ -364,3 +364,10 @@ details.card summary {
 .own-hint { margin-top: 16px; padding: 12px 16px; border: 2px dashed var(--border); border-radius: 12px; text-align: center; }
 .own-hint p { margin: 0 0 4px; }
 .own-hint .btn { margin-top: 8px; }
+
+/* Custom timer length and subject select on the 집중 tab */
+.custom-row { display: flex; gap: 8px; align-items: stretch; }
+.custom-row input { flex: 1; min-width: 0; }
+.custom-row .btn { width: auto; margin-top: 0; padding: 0 24px; }
+#focus-custom-form { margin-top: 4px; }
+#focus-idle select, #focus-done select { width: 100%; }

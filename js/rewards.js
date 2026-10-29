@@ -4,9 +4,9 @@
 export const DAILY_XP_CAP = 600;
 export const COINS_PER_CORRECT = 1;
 export const PERFECT_ROUND_COINS = 5;
-export const TIMER_BONUS_XP = 5;
-export const TIMER_BONUS_COINS = 2;
-export const TIMER_BONUS_MAX_PER_DAY = 3;
+export const XP_PER_FOCUS_MINUTE = 1; // a finished timer pays by its length
+export const FOCUS_MINUTES_PER_COIN = 5; // 1 coin per 5 finished minutes
+export const DAILY_FOCUS_MINUTE_CAP = 180; // minutes that count for the bonus per day
 export const CHECKIN_XP = 10;
 export const CHECKIN_COINS = 5;
 export const CHECKIN_STREAK_COINS_MAX = 7; // +1 coin per streak day, up to this many
@@ -14,7 +14,7 @@ export const CHECKIN_STREAK_COINS_MAX = 7; // +1 coin per streak day, up to this
 const MAX_STORED = 1_000_000_000; // keeps edited/broken saved numbers sane
 
 export function freshProfile() {
-  return { xp: 0, coins: 0, daily: { date: "", xp: 0, timerBonuses: 0 }, checkIn: { last: "", streak: 0 } };
+  return { xp: 0, coins: 0, daily: { date: "", xp: 0, focusMinutes: 0 }, checkIn: { last: "", streak: 0 } };
 }
 
 function count(value) {
@@ -32,7 +32,7 @@ export function sanitizeProfile(raw) {
     daily: {
       date: typeof d.date === "string" ? d.date : "",
       xp: count(d.xp),
-      timerBonuses: count(d.timerBonuses),
+      focusMinutes: count(d.focusMinutes),
     },
     checkIn: { last: typeof c.last === "string" ? c.last : "", streak: count(c.streak) },
   };
@@ -72,7 +72,7 @@ export function levelProgress(xp) {
 function forToday(profile, now) {
   const today = dateKey(now);
   if (profile.daily.date === today) return profile;
-  return { ...profile, daily: { date: today, xp: 0, timerBonuses: 0 } };
+  return { ...profile, daily: { date: today, xp: 0, focusMinutes: 0 } };
 }
 
 // XP counted against today's cap so far (for the "오늘 N/600 XP" line).
@@ -119,16 +119,27 @@ export function applyRound(profile, record, now) {
   return grant(profile, now, xp, coins);
 }
 
-// Small bonus for a finished focus timer, at most TIMER_BONUS_MAX_PER_DAY times a day.
-// `granted` is false once today's bonuses are used up.
-export function applyTimerBonus(profile, now) {
+// Bonus minutes still available today (of DAILY_FOCUS_MINUTE_CAP), for the focus screen.
+export function focusMinutesLeftToday(profile, now) {
+  return Math.max(0, DAILY_FOCUS_MINUTE_CAP - forToday(profile, now).daily.focusMinutes);
+}
+
+// Bonus for a FINISHED focus timer of `minutes` minutes: 1 XP per minute and 1 coin per 5 minutes.
+// At most DAILY_FOCUS_MINUTE_CAP minutes count per day, so leaving timers running cannot be
+// farmed. The XP is part of the normal daily XP cap, so it can be cut by that as well.
+//  - Coins are worked out from the day's total minutes, so short timers do not lose their
+//    remainder (five 1-minute timers give 1 coin together).
+//  - `minutes` in the result is how many minutes were counted; `minutesCapped` is true if the
+//    minute cap cut it short. `granted` is false when nothing counted (cap already used up).
+export function applyTimerBonus(profile, minutes, now) {
   const today = forToday(profile, now);
-  if (today.daily.timerBonuses >= TIMER_BONUS_MAX_PER_DAY) {
-    return { profile: today, gained: { xp: 0, coins: 0, capped: false }, granted: false };
-  }
-  const result = grant(today, now, TIMER_BONUS_XP, TIMER_BONUS_COINS);
-  result.profile.daily.timerBonuses += 1;
-  return { ...result, granted: true };
+  const requested = Number.isInteger(minutes) && minutes > 0 ? minutes : 0;
+  const used = today.daily.focusMinutes;
+  const counted = Math.min(requested, Math.max(0, DAILY_FOCUS_MINUTE_CAP - used));
+  const coins = Math.floor((used + counted) / FOCUS_MINUTES_PER_COIN) - Math.floor(used / FOCUS_MINUTES_PER_COIN);
+  const result = grant(today, now, counted * XP_PER_FOCUS_MINUTE, coins);
+  result.profile.daily.focusMinutes = used + counted; // fresh object made by grant()
+  return { ...result, granted: counted > 0, minutes: counted, minutesCapped: counted < requested };
 }
 
 /* ---------- Daily check-in and streak ---------- */
@@ -200,6 +211,6 @@ export function applyRoundWithCheckIn(profile, record, now) {
   return withCheckIn(profile, now, (p) => applyRound(p, record, now));
 }
 
-export function applyTimerWithCheckIn(profile, now) {
-  return withCheckIn(profile, now, (p) => applyTimerBonus(p, now));
+export function applyTimerWithCheckIn(profile, minutes, now) {
+  return withCheckIn(profile, now, (p) => applyTimerBonus(p, minutes, now));
 }

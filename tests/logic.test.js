@@ -18,7 +18,7 @@ import {
 } from "../js/history.js";
 
 import {
-  DAILY_XP_CAP, TIMER_BONUS_XP, TIMER_BONUS_COINS, TIMER_BONUS_MAX_PER_DAY,
+  DAILY_XP_CAP, DAILY_FOCUS_MINUTE_CAP, XP_PER_FOCUS_MINUTE, FOCUS_MINUTES_PER_COIN, focusMinutesLeftToday,
   freshProfile, sanitizeProfile, dateKey, xpForLevel, levelForXp, levelProgress,
   rewardsForRound, applyRound, applyTimerBonus, xpLeftToday,
   CHECKIN_XP, applyCheckIn, canCheckIn, currentStreak,
@@ -26,7 +26,7 @@ import {
 } from "../js/rewards.js";
 
 import {
-  DURATIONS, startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer,
+  PRESET_MINUTES, MIN_MINUTES, MAX_MINUTES, parseMinutes, isValidMinutes, startTimer, remainingMs, isFinished, progress, formatRemaining, sanitizeTimer,
   isPaused, pauseTimer, resumeTimer,
 } from "../js/timer.js";
 
@@ -624,45 +624,131 @@ test("daily cap: a new calendar day starts the count again", () => {
   assert.equal(r.gained.xp, 100);
   assert.equal(r.profile.xp, DAILY_XP_CAP + 100);
 });
-test("timer bonus gives a small XP and coin amount", () => {
-  const r = applyTimerBonus(freshProfile(), at(29));
+test("timer bonus is 1 XP per finished minute and 1 coin per 5 minutes", () => {
+  assert.equal(XP_PER_FOCUS_MINUTE, 1);
+  assert.equal(FOCUS_MINUTES_PER_COIN, 5);
+  const r = applyTimerBonus(freshProfile(), 25, at(29));
   assert.equal(r.granted, true);
-  assert.deepEqual(r.gained, { xp: TIMER_BONUS_XP, coins: TIMER_BONUS_COINS, capped: false });
-  assert.equal(r.profile.xp, TIMER_BONUS_XP);
+  assert.deepEqual(r.gained, { xp: 25, coins: 5, capped: false });
+  assert.equal(r.minutes, 25);
+  assert.equal(r.minutesCapped, false);
+  assert.equal(r.profile.xp, 25);
+  assert.equal(r.profile.coins, 5);
 });
-test("timer bonus: only TIMER_BONUS_MAX_PER_DAY times a day, then nothing", () => {
+test("timer bonus for the lengths on the buttons and for the longest custom length", () => {
+  const gain = (m) => applyTimerBonus(freshProfile(), m, at(29)).gained;
+  assert.deepEqual(gain(1), { xp: 1, coins: 0, capped: false });
+  assert.deepEqual(gain(4), { xp: 4, coins: 0, capped: false });
+  assert.deepEqual(gain(10), { xp: 10, coins: 2, capped: false });
+  assert.deepEqual(gain(15), { xp: 15, coins: 3, capped: false });
+  assert.deepEqual(gain(120), { xp: 120, coins: 24, capped: false });
+});
+test("a longer timer pays more than a short one (the reason for the change)", () => {
+  const one = applyTimerBonus(freshProfile(), 1, at(29)).gained;
+  const long = applyTimerBonus(freshProfile(), 25, at(29)).gained;
+  assert.ok(long.xp > one.xp && long.coins > one.coins);
+});
+test("timer coins use the day's total minutes: five 1-minute timers give 1 coin together", () => {
   let profile = freshProfile();
-  for (let i = 0; i < TIMER_BONUS_MAX_PER_DAY; i++) {
-    const r = applyTimerBonus(profile, at(29));
-    assert.equal(r.granted, true);
+  const coins = [];
+  for (let i = 0; i < 5; i++) {
+    const r = applyTimerBonus(profile, 1, at(29));
     profile = r.profile;
+    coins.push(r.gained.coins);
   }
-  const extra = applyTimerBonus(profile, at(29));
-  assert.equal(extra.granted, false);
-  assert.deepEqual(extra.gained, { xp: 0, coins: 0, capped: false });
-  assert.equal(extra.profile.xp, TIMER_BONUS_XP * TIMER_BONUS_MAX_PER_DAY);
-  assert.equal(applyTimerBonus(extra.profile, at(30)).granted, true); // next day works again
+  assert.deepEqual(coins, [0, 0, 0, 0, 1]);
+  assert.equal(profile.xp, 5);
+  assert.equal(profile.coins, 1);
 });
-test("timer bonus counts toward the daily XP cap", () => {
-  const profile = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP - 2 }), at(29)).profile;
-  const r = applyTimerBonus(profile, at(29));
-  assert.equal(r.gained.xp, 2);
+test("daily minute cap: at most 180 minutes count, the timer that crosses it counts partly", () => {
+  assert.equal(DAILY_FOCUS_MINUTE_CAP, 180);
+  const first = applyTimerBonus(freshProfile(), 120, at(29));
+  const second = applyTimerBonus(first.profile, 120, at(29)); // only 60 minutes are left
+  assert.equal(second.minutes, 60);
+  assert.equal(second.minutesCapped, true);
+  assert.equal(second.granted, true);
+  assert.deepEqual(second.gained, { xp: 60, coins: 12, capped: false });
+  assert.equal(second.profile.xp, 180);
+  assert.equal(second.profile.daily.focusMinutes, 180);
+  assert.equal(focusMinutesLeftToday(second.profile, at(29)), 0);
+});
+test("daily minute cap: after 180 minutes a finished timer gives nothing", () => {
+  const full = applyTimerBonus(freshProfile(), 120, at(29)).profile;
+  const capped = applyTimerBonus(applyTimerBonus(full, 60, at(29)).profile, 25, at(29));
+  assert.equal(capped.granted, false);
+  assert.equal(capped.minutes, 0);
+  assert.equal(capped.minutesCapped, true);
+  assert.deepEqual(capped.gained, { xp: 0, coins: 0, capped: false });
+  assert.equal(capped.profile.xp, 180);
+  assert.equal(capped.profile.coins, 36);
+});
+test("daily minute cap: the most a day of timers can give is 180 XP and 36 coins", () => {
+  let profile = freshProfile();
+  for (let i = 0; i < 20; i++) profile = applyTimerBonus(profile, 25, at(29)).profile; // 500 minutes of timers
+  assert.equal(profile.xp, 180);
+  assert.equal(profile.coins, 36);
+});
+test("daily minute cap: a new calendar day starts the minutes again", () => {
+  const used = applyTimerBonus(freshProfile(), 120, at(29)).profile;
+  const day1 = applyTimerBonus(used, 60, at(29)).profile; // 180 used
+  assert.equal(focusMinutesLeftToday(day1, at(29, 23)), 0);
+  assert.equal(focusMinutesLeftToday(day1, at(30, 1)), 180);
+  const next = applyTimerBonus(day1, 25, at(30, 1));
+  assert.equal(next.granted, true);
+  assert.equal(next.gained.xp, 25);
+});
+test("timer XP counts toward the 600 daily XP cap and is cut by it", () => {
+  const nearCap = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP - 10 }), at(29)).profile; // 590
+  const r = applyTimerBonus(nearCap, 25, at(29));
+  assert.equal(r.gained.xp, 10); // only 10 XP were left
   assert.equal(r.gained.capped, true);
-  assert.equal(r.gained.coins, TIMER_BONUS_COINS);
+  assert.equal(r.gained.coins, 5); // coins are not capped
+  assert.equal(r.minutes, 25); // the minutes still count against the 180-minute cap
+  assert.equal(r.minutesCapped, false);
+  assert.equal(r.profile.xp, DAILY_XP_CAP);
+  assert.equal(xpLeftToday(r.profile, at(29)), 0);
 });
-test("leaving the timer running cannot be farmed: 3 bonuses are worth at most 15 XP a day", () => {
-  assert.equal(TIMER_BONUS_XP * TIMER_BONUS_MAX_PER_DAY, 15);
+test("with the 600 XP cap already full a timer gives 0 XP but still coins", () => {
+  const full = applyRound(freshProfile(), roundRec({ score: DAILY_XP_CAP }), at(29)).profile;
+  const r = applyTimerBonus(full, 10, at(29));
+  assert.deepEqual(r.gained, { xp: 0, coins: 2, capped: true });
+  assert.equal(r.granted, true);
+});
+test("focus XP is added to today's XP, so rounds and timers share the same 600", () => {
+  const afterTimer = applyTimerBonus(freshProfile(), 120, at(29)).profile;
+  assert.equal(xpEarnedToday(afterTimer, at(29)), 120);
+  const afterRound = applyRound(afterTimer, roundRec({ score: 195 }), at(29)).profile;
+  assert.equal(xpEarnedToday(afterRound, at(29)), 315);
+  const lots = applyRound(afterRound, roundRec({ score: 500 }), at(29));
+  assert.equal(lots.gained.xp, 285); // 600 - 315
+  assert.equal(lots.gained.capped, true);
+});
+test("invalid minutes give nothing (0, negative, fractions, NaN, text)", () => {
+  for (const bad of [0, -5, 1.5, NaN, "10", null, undefined]) {
+    const r = applyTimerBonus(freshProfile(), bad, at(29));
+    assert.equal(r.granted, false);
+    assert.deepEqual(r.gained, { xp: 0, coins: 0, capped: false });
+    assert.equal(r.minutesCapped, false);
+  }
+});
+test("applyTimerBonus does not change the profile it was given", () => {
+  const before = freshProfile();
+  applyTimerBonus(before, 25, at(29));
+  assert.deepEqual(before, freshProfile());
 });
 test("sanitizeProfile repairs missing, negative and non-number data", () => {
   assert.deepEqual(sanitizeProfile(null), freshProfile());
   assert.deepEqual(sanitizeProfile("x"), freshProfile());
-  const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, timerBonuses: 2.7 }, checkIn: 3 });
-  assert.deepEqual(p, { ...freshProfile(), daily: { date: "", xp: 0, timerBonuses: 2 } });
+  const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, focusMinutes: 2.7 }, checkIn: 3 });
+  assert.deepEqual(p, { ...freshProfile(), daily: { date: "", xp: 0, focusMinutes: 2 } });
   const saved = {
-    xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, timerBonuses: 1 },
+    xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, focusMinutes: 40 },
     checkIn: { last: "2026-10-29", streak: 4 },
   };
   assert.deepEqual(sanitizeProfile(saved), saved);
+  // a profile saved by the older fixed-bonus version has no focusMinutes: it starts at 0
+  const old = sanitizeProfile({ xp: 5, coins: 1, daily: { date: "2026-10-29", xp: 5, timerBonuses: 3 } });
+  assert.equal(old.daily.focusMinutes, 0);
 });
 
 /* ---------- rewards.js: daily check-in and streak ---------- */
@@ -793,16 +879,22 @@ test("auto check-in XP stays outside the daily cap, the round XP is still capped
   assert.equal(r.profile.xp, DAILY_XP_CAP + CHECKIN_XP);
   assert.equal(xpEarnedToday(r.profile, at(29)), DAILY_XP_CAP);
 });
-test("finishing a focus timer also checks in, and still limits the timer bonus", () => {
-  const r = applyTimerWithCheckIn(freshProfile(), at(29));
+test("finishing a focus timer also checks in, and pays by its length", () => {
+  const r = applyTimerWithCheckIn(freshProfile(), 25, at(29));
   assert.equal(r.checkIn.granted, true);
   assert.equal(r.granted, true);
-  assert.equal(r.profile.xp, TIMER_BONUS_XP + CHECKIN_XP);
-  let profile = r.profile;
-  for (let i = 1; i < TIMER_BONUS_MAX_PER_DAY; i++) profile = applyTimerWithCheckIn(profile, at(29)).profile;
-  const extra = applyTimerWithCheckIn(profile, at(29));
-  assert.equal(extra.granted, false); // bonus used up
-  assert.equal(extra.checkIn.granted, false); // and no second check-in
+  assert.equal(r.profile.xp, 25 + CHECKIN_XP);
+  assert.equal(r.profile.coins, 5 + 6);
+  const next = applyTimerWithCheckIn(r.profile, 10, at(29, 15));
+  assert.equal(next.checkIn.granted, false); // one check-in a day
+  assert.equal(next.profile.xp, 25 + CHECKIN_XP + 10);
+});
+test("a timer finished after the minute cap is used up still counts as the day's check-in", () => {
+  const full = applyTimerBonus(freshProfile(), 120, at(29)).profile;
+  const capped = applyTimerBonus(applyTimerBonus(full, 60, at(29)).profile, 5, at(29)).profile;
+  const r = applyTimerWithCheckIn(capped, 25, at(29));
+  assert.equal(r.granted, false);
+  assert.equal(r.checkIn.granted, true);
 });
 test("edge case: with the clock set backwards a round still pays, but gives no check-in", () => {
   const p = applyCheckIn(freshProfile(), at(10)).profile;
@@ -823,8 +915,48 @@ test("xpEarnedToday counts today's XP only and starts again on a new day", () =>
 const T0 = at(29, 10);
 const MIN = 60_000;
 
-test("timer offers 1 (demo), 10, 15 and 25 minutes", () => {
-  assert.deepEqual(DURATIONS, [1, 10, 15, 25]);
+test("timer buttons are 1 (demo), 10, 15 and 25 minutes; custom length is 1 to 120", () => {
+  assert.deepEqual(PRESET_MINUTES, [1, 10, 15, 25]);
+  assert.equal(MIN_MINUTES, 1);
+  assert.equal(MAX_MINUTES, 120);
+});
+test("parseMinutes accepts whole minutes from 1 to 120", () => {
+  assert.deepEqual(parseMinutes("30"), { minutes: 30 });
+  assert.deepEqual(parseMinutes("1"), { minutes: 1 });
+  assert.deepEqual(parseMinutes("120"), { minutes: 120 });
+  assert.deepEqual(parseMinutes("  45 "), { minutes: 45 }); // spaces are ignored
+  assert.deepEqual(parseMinutes("007"), { minutes: 7 });
+});
+test("parseMinutes: empty input gives a clear message", () => {
+  for (const empty of ["", "   ", null, undefined]) {
+    assert.match(parseMinutes(empty).error, /입력해 주세요/);
+  }
+});
+test("parseMinutes: out of range gives a message that names the range", () => {
+  for (const bad of ["0", "121", "500", "99999999999999999999"]) {
+    const r = parseMinutes(bad);
+    assert.equal(r.minutes, undefined);
+    assert.match(r.error, /1분부터 120분까지/);
+  }
+});
+test("parseMinutes: anything that is not plain digits is refused", () => {
+  for (const bad of ["abc", "12.5", "-5", "+5", "1e2", "10분", "1 0", "０５"]) {
+    const r = parseMinutes(bad);
+    assert.equal(r.minutes, undefined, bad);
+    assert.match(r.error, /숫자만/, bad);
+  }
+});
+test("isValidMinutes", () => {
+  assert.equal(isValidMinutes(1), true);
+  assert.equal(isValidMinutes(120), true);
+  for (const bad of [0, 121, 2.5, NaN, "10", null]) assert.equal(isValidMinutes(bad), false);
+});
+test("any custom length works as a timer (e.g. 37 minutes), and sanitizeTimer keeps it", () => {
+  const t = startTimer(T0, 37);
+  assert.equal(remainingMs(t, T0), 37 * MIN);
+  assert.deepEqual(sanitizeTimer(JSON.parse(JSON.stringify(t))), t);
+  assert.equal(sanitizeTimer({ ...t, minutes: 121 }), null);
+  assert.equal(sanitizeTimer({ ...t, minutes: 0 }), null);
 });
 test("startTimer stores the end time (start + minutes) and is not paused", () => {
   assert.deepEqual(startTimer(T0, 25), { minutes: 25, endAt: T0 + 25 * MIN, pausedMs: null });
@@ -870,7 +1002,7 @@ test("sanitizeTimer keeps a real running timer and rejects broken ones", () => {
   assert.deepEqual(sanitizeTimer(t), t);
   assert.equal(sanitizeTimer(null), null);
   assert.equal(sanitizeTimer("x"), null);
-  assert.equal(sanitizeTimer({ ...t, minutes: 7 }), null); // not an offered length
+  assert.equal(sanitizeTimer({ ...t, minutes: 2.5 }), null); // not whole minutes
   assert.equal(sanitizeTimer({ ...t, endAt: "soon" }), null);
   assert.equal(sanitizeTimer({ minutes: 10 }), null);
   assert.equal(sanitizeTimer({ minutes: 10, endAt: null, pausedMs: null }), null);

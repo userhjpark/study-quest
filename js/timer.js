@@ -7,8 +7,28 @@
 //   paused:  pausedMs is the time left (frozen), endAt is null -> the clock no longer matters,
 //            so a paused timer can never finish and survives a reload unchanged.
 
-export const DURATIONS = [1, 10, 15, 25]; // minutes; 1 is for demos
+export const PRESET_MINUTES = [1, 10, 15, 25]; // the quick buttons; 1 is for demos
+export const MIN_MINUTES = 1;
+export const MAX_MINUTES = 120; // longest custom length
 const MINUTE = 60_000;
+
+// Whole minutes from MIN_MINUTES to MAX_MINUTES.
+export function isValidMinutes(minutes) {
+  return Number.isInteger(minutes) && minutes >= MIN_MINUTES && minutes <= MAX_MINUTES;
+}
+
+// Checks what the user typed in the "직접 설정" field. Returns { minutes } or { error } (a message
+// for the screen). Only plain digits are accepted: "12.5", "-5", "1e2" and "10분" are all errors.
+export function parseMinutes(text) {
+  const t = String(text ?? "").trim();
+  if (t === "") return { error: "시간(분)을 입력해 주세요." };
+  if (!/^\d+$/.test(t)) return { error: "분은 숫자만 입력할 수 있어요. 예: 30" };
+  const minutes = Number(t);
+  if (!isValidMinutes(minutes)) {
+    return { error: `${MIN_MINUTES}분부터 ${MAX_MINUTES}분까지 설정할 수 있어요.` };
+  }
+  return { minutes };
+}
 
 export function startTimer(now, minutes) {
   return { minutes, endAt: now + minutes * MINUTE, pausedMs: null };
@@ -58,7 +78,7 @@ export function formatRemaining(ms) {
 export function sanitizeTimer(raw) {
   if (raw === null || typeof raw !== "object") return null;
   const { minutes, endAt, pausedMs } = raw;
-  if (!DURATIONS.includes(minutes)) return null;
+  if (!isValidMinutes(minutes)) return null;
   if (Number.isFinite(endAt) && (pausedMs === null || pausedMs === undefined)) {
     return { minutes, endAt, pausedMs: null };
   }

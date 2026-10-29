@@ -11,10 +11,10 @@ import {
 } from "./quiz.js";
 import {
   DAILY_XP_CAP, sanitizeProfile, levelForXp, levelProgress, currentStreak, canCheckIn, applyCheckIn,
-  applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday,
+  applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday, focusMinutesLeftToday, DAILY_FOCUS_MINUTE_CAP,
 } from "./rewards.js";
 import {
-  startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer,
+  startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer, parseMinutes,
 } from "./timer.js";
 import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
@@ -274,16 +274,16 @@ function rewardMessage(gained, checkIn, levelUp) {
 
 let tickHandle = null; // setInterval id while a timer is running
 
-function subjectLabel() {
-  return scopeLabel() ?? "전체 과목";
-}
-
 // Shows whatever the focus state says. Also puts a dot on the tab if a finished timer is waiting.
 function refreshFocus() {
   const { focus } = state;
   ui.showFocus(focus.phase);
+  if (focus.phase === "idle") {
+    const left = focusMinutesLeftToday(state.profile, Date.now());
+    ui.setFocusBonusInfo(`오늘 보너스를 받을 수 있는 시간: ${left}분 남음 (하루 ${DAILY_FOCUS_MINUTE_CAP}분까지)`);
+  }
   if (focus.phase === "running") showTimerNow();
-  if (focus.phase === "done") ui.showTimerDone({ reward: focus.reward, subjectLabel: subjectLabel() });
+  if (focus.phase === "done") ui.showTimerDone({ reward: focus.reward });
   ui.setFocusAlert(focus.phase === "done" && state.tab !== "focus");
 }
 
@@ -310,6 +310,18 @@ function tickTimer() {
   if (focus.phase !== "running") return;
   if (isFinished(focus.timer, Date.now())) finishTimer();
   else showTimerNow();
+}
+
+// "직접 설정": check what was typed, show the problem on the screen if there is one.
+function handleFocusCustom(text) {
+  if (state.focus.phase !== "idle") return;
+  const parsed = parseMinutes(text);
+  if (parsed.error) {
+    ui.setFocusCustomError(parsed.error);
+    return;
+  }
+  ui.clearFocusCustom();
+  handleFocusStart(parsed.minutes);
 }
 
 function handleFocusStart(minutes) {
@@ -359,22 +371,35 @@ function quitFocus() {
   refreshFocus();
 }
 
-// The timer ran out: small bonus (and today's check-in), then the "집중 완료!" screen.
+// What the 집중 완료 screen says: the minutes that counted, then the XP/coin/cap text of
+// rewardMessage. A used-up daily minute cap gets its own message.
+function timerRewardMessage(result, base) {
+  if (!result.granted) {
+    return {
+      text: `오늘의 집중 보너스(${DAILY_FOCUS_MINUTE_CAP}분)는 모두 받았어요. 퀴즈로 XP를 모아 보세요!`,
+      capped: true,
+      checkInText: base.checkInText,
+    };
+  }
+  const prefix = result.minutesCapped
+    ? `오늘 보너스 한도(${DAILY_FOCUS_MINUTE_CAP}분)에 도달해서 ${result.minutes}분만 인정됐어요. `
+    : `${result.minutes}분 집중! `;
+  return { ...base, text: prefix + base.text, capped: base.capped || result.minutesCapped };
+}
+
+// The timer ran out: bonus by its length (and today's check-in), then the "집중 완료!" screen.
 // The saved timer is removed first so a reload cannot give the bonus twice.
 function finishTimer() {
   stopTicking();
+  const { minutes } = state.focus.timer;
   save("timer", null);
   const before = state.profile;
-  const result = applyTimerWithCheckIn(before, Date.now());
+  const result = applyTimerWithCheckIn(before, minutes, Date.now());
   state.profile = result.profile;
   save("profile", state.profile);
 
-  const reward = rewardMessage(result.gained, result.checkIn, levelUpText(before, state.profile));
-  if (!result.granted) {
-    reward.text = "오늘의 타이머 보너스(하루 3번)는 모두 받았어요. 퀴즈로 XP를 모아 보세요!";
-    reward.capped = false;
-  }
-  state.focus = { ...idleFocus(), phase: "done", reward };
+  const base = rewardMessage(result.gained, result.checkIn, levelUpText(before, state.profile));
+  state.focus = { ...idleFocus(), phase: "done", reward: timerRewardMessage(result, base) };
   refreshProfile();
   refreshFocus();
 }
@@ -395,6 +420,7 @@ function handleFocusQuiz() {
 
 function handleVisible() {
   refreshProfile();
+  refreshFocus(); // e.g. the "bonus minutes left today" line after midnight
   tickTimer();
 }
 
@@ -556,6 +582,7 @@ ui.bindEvents({
   onCheckIn: handleCheckIn,
   onVisible: handleVisible,
   onFocusStart: handleFocusStart,
+  onFocusCustom: handleFocusCustom,
   onFocusCancel: handleFocusCancel,
   onFocusResume: handleFocusResume,
   onOpenNotes: () => handleTab("notes"),

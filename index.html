@@ -37,19 +37,27 @@
       <div class="card">
         <div id="focus-idle">
           <h2>집중 타이머</h2>
-          <p class="hint">시간을 정하고 공부에 집중해 보세요. 끝까지 해내면 작은 보너스를 받고, 바로 퀴즈를 풀 수 있어요.</p>
+          <p class="hint">시간을 정하고 공부에 집중해 보세요. 끝까지 마치면 1분마다 1 XP, 5분마다 1 코인을 받고, 바로 퀴즈를 풀 수 있어요.</p>
           <div id="focus-durations" class="chips" role="group" aria-label="집중 시간">
             <button class="chip duration-btn" data-minutes="1" type="button">1분 (데모)</button>
             <button class="chip duration-btn" data-minutes="10" type="button">10분</button>
             <button class="chip duration-btn" data-minutes="15" type="button">15분</button>
             <button class="chip duration-btn" data-minutes="25" type="button">25분</button>
           </div>
-          <p class="hint">시간을 누르면 바로 시작해요. 보너스는 하루 3번까지, 끝까지 마쳤을 때만 받아요.</p>
-          <div class="own-hint" hidden>
-            <p><strong>내 개념을 추가해보세요</strong></p>
-            <p class="hint">지금은 예시 개념만 있어요.</p>
-            <button class="btn btn-secondary open-notes-btn" type="button">노트 열기</button>
-          </div>
+
+          <form id="focus-custom-form" autocomplete="off" novalidate>
+            <label for="focus-custom-input">직접 설정 <span class="hint-inline">(1~120분)</span></label>
+            <div class="custom-row">
+              <input id="focus-custom-input" type="text" inputmode="numeric" maxlength="4" placeholder="예: 30">
+              <button class="btn btn-primary" type="submit">시작</button>
+            </div>
+            <p id="focus-custom-error" class="error" role="alert"></p>
+          </form>
+
+          <label for="focus-subject-select">공부할 과목</label>
+          <select id="focus-subject-select"></select>
+          <p class="hint">타이머가 끝나면 이 과목으로 퀴즈를 풀어요. 퀴즈 탭의 과목과 같이 바뀌어요.</p>
+          <p id="focus-bonus-info" class="hint"></p>
         </div>
 
         <div id="focus-running" class="center" hidden>
@@ -70,7 +78,8 @@
           <h2>집중 완료!</h2>
           <p id="focus-reward" class="result-reward" role="status"></p>
           <p id="focus-checkin" class="result-reward" role="status"></p>
-          <p id="focus-subject" class="hint"></p>
+          <label for="done-subject-select">퀴즈 과목</label>
+          <select id="done-subject-select"></select>
           <button id="focus-quiz-btn" class="btn btn-primary" type="button">퀴즈 시작</button>
           <button id="focus-back-btn" class="btn btn-secondary" type="button">타이머로 돌아가기</button>
         </div>

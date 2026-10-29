@@ -4,6 +4,9 @@
 
 const $ = (id) => document.getElementById(id);
 
+// The three subject drop-downs (quiz tab, 집중 start screen, 집중 finish screen).
+const SUBJECT_SELECT_IDS = ["quiz-subject", "focus-subject-select", "done-subject-select"];
+
 // Separator button names in the HTML -> the real character.
 const SEP_BY_NAME = { ":": ":", "/": "/", tab: "\t" };
 
@@ -37,6 +40,11 @@ export function bindEvents(h) {
   document.querySelectorAll(".duration-btn").forEach((btn) => {
     btn.addEventListener("click", () => h.onFocusStart(Number(btn.dataset.minutes)));
   });
+  $("focus-custom-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    h.onFocusCustom($("focus-custom-input").value);
+  });
+  $("focus-custom-input").addEventListener("input", () => setFocusCustomError(""));
   $("focus-cancel-btn").addEventListener("click", h.onFocusCancel);
   $("focus-quit-btn").addEventListener("click", h.onFocusCancel);
   $("focus-resume-btn").addEventListener("click", h.onFocusResume);
@@ -63,7 +71,11 @@ export function bindEvents(h) {
   $("focus-back-btn").addEventListener("click", h.onFocusBack);
 
   // Quiz
-  $("quiz-subject").addEventListener("change", () => h.onQuizSubject($("quiz-subject").value));
+  // The subject can be chosen on the quiz tab and on the 집중 start and finish screens; all three
+  // show the same choice.
+  for (const id of SUBJECT_SELECT_IDS) {
+    $(id).addEventListener("change", () => h.onQuizSubject($(id).value));
+  }
   $("start-btn").addEventListener("click", h.onStart);
   $("next-btn").addEventListener("click", h.onNext);
   $("end-btn").addEventListener("click", h.onEnd);
@@ -318,19 +330,21 @@ export function renderBulk({ separator, isManual, preview }) {
 
 // subjects: [{ name, count }]. `selected` is a subject name or the "all" value.
 export function renderQuizSubjects(subjects, total, selected, allValue) {
-  const select = $("quiz-subject");
-  select.replaceChildren();
-  const all = document.createElement("option");
-  all.value = allValue;
-  all.textContent = `전체 과목 (${total})`;
-  select.append(all);
-  for (const s of subjects) {
-    const option = document.createElement("option");
-    option.value = s.name;
-    option.textContent = `${s.name} (${s.count})`;
-    select.append(option);
+  for (const id of SUBJECT_SELECT_IDS) {
+    const select = $(id);
+    select.replaceChildren();
+    const all = document.createElement("option");
+    all.value = allValue;
+    all.textContent = `전체 과목 (${total})`;
+    select.append(all);
+    for (const s of subjects) {
+      const option = document.createElement("option");
+      option.value = s.name;
+      option.textContent = `${s.name} (${s.count})`;
+      select.append(option);
+    }
+    select.value = selected;
   }
-  select.value = selected;
 }
 
 export function setQuizSubjectEnabled(enabled) {
@@ -511,11 +525,23 @@ export function renderTimer(timeText, fraction, paused) {
   document.title = `${paused ? "일시정지 " : ""}${timeText} · ${BASE_TITLE}`;
 }
 
-export function showTimerDone({ reward, subjectLabel }) {
+export function setFocusCustomError(message) {
+  $("focus-custom-error").textContent = message || "";
+}
+
+export function clearFocusCustom() {
+  $("focus-custom-input").value = "";
+  setFocusCustomError("");
+}
+
+export function setFocusBonusInfo(text) {
+  $("focus-bonus-info").textContent = text;
+}
+
+export function showTimerDone({ reward }) {
   $("focus-reward").textContent = reward.text;
   $("focus-reward").classList.toggle("is-capped", reward.capped);
   $("focus-checkin").textContent = reward.checkInText;
-  $("focus-subject").textContent = `퀴즈 과목: ${subjectLabel} (바꾸려면 퀴즈 탭에서 고르세요)`;
 }
 
 // Dot on the "집중" tab while a finished timer is waiting to be seen.
