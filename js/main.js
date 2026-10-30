@@ -16,6 +16,8 @@ import {
 import {
   startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer, parseMinutes,
 } from "./timer.js";
+import { readPdfText, PdfError } from "./pdf-reader.js";
+import { appendText } from "./pdf-text.js";
 import { buildRoundRecord, addRecord, withPaidXp, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import {
@@ -210,6 +212,30 @@ function handleBulkSeparator(separator) {
   bulk.manualSeparator = separator;
   ui.setBulkStatus("");
   refreshBulk();
+}
+
+// PDF -> text -> the same box and preview as pasted text. The text is appended below what is
+// already there. Expected problems (scan, too big, ...) come as PdfError with a Korean message.
+let pdfBusy = false;
+
+async function handlePdfFile(file) {
+  if (pdfBusy) return;
+  pdfBusy = true;
+  ui.setBulkStatus("");
+  ui.setPdfState({ status: "PDF를 읽는 중…", busy: true });
+  let done = { status: "" };
+  try {
+    const { text, pages } = await readPdfText(file, (page, total) => {
+      ui.setPdfState({ status: `PDF를 읽는 중… (${page}/${total}쪽)`, busy: true });
+    });
+    ui.setBulkText(appendText(ui.getBulkInput().text, text));
+    refreshBulk();
+    done = { status: `${pages}쪽을 읽었어요. 아래 미리보기를 확인하고 추가하세요.` };
+  } catch (err) {
+    done = { error: err instanceof PdfError ? err.message : "PDF를 읽지 못했어요." };
+  }
+  pdfBusy = false;
+  ui.setPdfState(done);
 }
 
 function handleBulkAdd() {
@@ -704,6 +730,7 @@ ui.bindEvents({
   onBulkChange: handleBulkChange,
   onBulkSeparator: handleBulkSeparator,
   onBulkAdd: handleBulkAdd,
+  onPdfFile: handlePdfFile,
   onQuizSubject: handleQuizSubject,
   onStart: handleStart,
   onNext: handleNext,

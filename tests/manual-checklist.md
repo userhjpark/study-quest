@@ -192,6 +192,21 @@ Use a hard refresh (Ctrl+Shift+R). For a fresh start, clear the site data for th
 - [ ] Next day (change the saved `daily.date` to yesterday and reload): the card restarts at zero, the streak stays if you checked in yesterday.
 - [ ] Phone: the four numbers show as 2×2 and nothing scrolls sideways.
 
+## PDF import (노트 tab, "PDF에서 불러오기")
+
+Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a PDF is chosen). Test files: any text PDF with lines like "개념: 정의" (e.g. export a Google Doc or Word file to PDF), plus a photographed/scanned PDF.
+
+- [ ] **Normal PDF:** open "여러 개 한 번에 추가", press "PDF에서 불러오기", choose a text PDF. It shows "PDF를 읽는 중… (1/N쪽)", then "N쪽을 읽었어요…". The lines appear in the "붙여 넣기" box and the usual preview (ok / duplicate / invalid) appears. Korean text is not garbled.
+- [ ] Lines in the form "개념: 정의" are "ok"; headings and page numbers are red "구분 기호가 없어요" (skipped). "추가하기" saves only the ok ones into the chosen subject.
+- [ ] **Append:** type a line in the box first, then load a PDF: the old line stays, a blank line follows, then the PDF text. Loading a second PDF appends again.
+- [ ] Choosing the same file twice in a row works both times.
+- [ ] **Edge case, scanned/picture PDF:** the red message "글자를 읽을 수 없는 PDF예요…" appears and the box does not change.
+- [ ] **Too big / too long:** a PDF over 10 MB shows "파일이 너무 커요…" and one over 50 pages shows "페이지가 너무 많아요 (N쪽)…". Nothing is added.
+- [ ] A text file renamed to .pdf (or a PNG) shows a red error ("PDF를 읽지 못했어요…" or "PDF 파일만…"), no crash.
+- [ ] **Offline:** DevTools > Network > Offline, then choose a PDF: "PDF 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요." Pasting text and everything else still works. Back online, the next try works.
+- [ ] While a PDF is being read the button is disabled; afterwards it is enabled again (also after an error).
+- [ ] Phone: the button and the hint fit on the screen, a PDF from the phone's files can be chosen.
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.

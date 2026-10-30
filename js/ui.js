@@ -31,6 +31,12 @@ export function bindEvents(h) {
     btn.addEventListener("click", () => h.onBulkSeparator(SEP_BY_NAME[btn.dataset.sep]));
   });
   $("bulk-add-btn").addEventListener("click", h.onBulkAdd);
+  $("pdf-btn").addEventListener("click", () => $("pdf-input").click());
+  $("pdf-input").addEventListener("change", () => {
+    const file = $("pdf-input").files[0];
+    $("pdf-input").value = ""; // so the same file can be chosen again later
+    if (file) h.onPdfFile(file);
+  });
 
   // Profile
   $("checkin-btn").addEventListener("click", h.onCheckIn);
@@ -258,6 +264,18 @@ export function renderSubjectSuggestions(subjects) {
 
 export function getBulkInput() {
   return { text: $("bulk-text").value, subject: $("bulk-subject").value };
+}
+
+// Puts text below what is already in the box (the caller decides the exact text).
+export function setBulkText(text) {
+  $("bulk-text").value = text;
+}
+
+// PDF line under the button: `status` is a progress/result text, `error` a red message.
+export function setPdfState({ status = "", error = "", busy = false }) {
+  $("pdf-status").textContent = status;
+  $("pdf-error").textContent = error;
+  $("pdf-btn").disabled = busy;
 }
 
 export function clearBulk() {

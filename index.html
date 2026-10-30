@@ -120,6 +120,14 @@
           <label for="bulk-subject">과목 <span class="hint-inline">(붙여 넣은 개념이 모두 이 과목에 들어가요)</span></label>
           <input id="bulk-subject" type="text" maxlength="30" list="subject-list" placeholder="예: 한국사 (비워 두면 미분류)" autocomplete="off">
 
+          <div class="pdf-row">
+            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden>
+            <button id="pdf-btn" class="btn btn-secondary" type="button">PDF에서 불러오기</button>
+            <span class="hint-inline">글자가 있는 PDF만 (10MB, 50쪽까지)</span>
+          </div>
+          <p id="pdf-status" class="hint" role="status"></p>
+          <p id="pdf-error" class="error" role="alert"></p>
+
           <label for="bulk-text">붙여 넣기</label>
           <textarea id="bulk-text" rows="6" placeholder="광합성: 식물이 빛으로 양분을 만드는 과정&#10;리보솜: 단백질을 합성하는 세포 소기관"></textarea>
 
