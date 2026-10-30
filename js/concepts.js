@@ -100,6 +100,16 @@ export function deleteConcept(concepts, id) {
   return concepts.filter((c) => c.id !== id);
 }
 
+// Deletes several concepts at once. `ids` is any list or Set of ids; ids that do not exist are
+// ignored. Returns the new list and the ids that were really removed (so the caller can also
+// clean up data kept per concept, e.g. miss counts).
+export function deleteMany(concepts, ids) {
+  const wanted = new Set(ids);
+  const removedIds = concepts.filter((c) => wanted.has(c.id)).map((c) => c.id);
+  if (removedIds.length === 0) return { concepts, removedIds };
+  return { concepts: concepts.filter((c) => !wanted.has(c.id)), removedIds };
+}
+
 // Stored data could be edited, damaged, or from before subjects existed.
 // Keep well-formed entries and give old ones the default subject.
 export function sanitizeConcepts(list) {
@@ -148,4 +158,32 @@ export function visibleGroups(concepts, filter) {
   const groups = groupBySubject(concepts);
   if (filter === ALL_SUBJECTS) return groups;
   return groups.filter((g) => g.name === filter);
+}
+
+// Ids of the concepts you can SEE in the Notes list: one subject for a subject filter, or every
+// subject whose group is not collapsed for "전체". "전체 선택" and "선택 삭제" only work on these, so
+// nothing hidden is ever deleted by accident.
+export function visibleConceptIds(concepts, filter, collapsed) {
+  return visibleGroups(concepts, filter)
+    .filter((g) => filter !== ALL_SUBJECTS || !collapsed.has(g.name))
+    .flatMap((g) => g.concepts.map((c) => c.id));
+}
+
+// The selected ids that are visible right now (a selection can include concepts that were
+// hidden afterwards by a filter change or a collapsed group).
+export function selectedVisibleIds(selectedIds, visibleIds) {
+  const selected = new Set(selectedIds);
+  return visibleIds.filter((id) => selected.has(id));
+}
+
+// "전체 선택" toggles: if every visible concept is selected, the visible ones are un-selected,
+// otherwise all visible ones get selected. Returns a NEW Set; other selected ids are kept.
+export function toggleSelectAll(selectedIds, visibleIds) {
+  const next = new Set(selectedIds);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => next.has(id));
+  for (const id of visibleIds) {
+    if (allSelected) next.delete(id);
+    else next.add(id);
+  }
+  return next;
 }

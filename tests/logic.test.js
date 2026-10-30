@@ -6,6 +6,7 @@ import {
   SAMPLE_CONCEPTS, DEFAULT_SUBJECT, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
   listSubjects, filterBySubject, resolveSubject, isDuplicate,
   normalizeFilter, groupBySubject, visibleGroups, hasOwnConcepts,
+  deleteMany, visibleConceptIds, selectedVisibleIds, toggleSelectAll,
 } from "../js/concepts.js";
 import {
   PDF_MAX_BYTES, PDF_MAX_PAGES, PDF_MESSAGES, checkPdfFile, checkPageCount, looksScanned,
@@ -1712,6 +1713,63 @@ test("pdf wrap: the wrapped definition passes the preview as one ok concept", ()
   const preview = buildPreview(parseLines(text, ":"), [], "컴활");
   assert.deepEqual(preview.counts, { ok: 2, duplicate: 0, invalid: 0 });
   assert.equal(preview.toAdd[0].definition, "사용자를 대신해 요청을 전달하고 결과를 저장해 두는 서버");
+});
+
+/* ---------- Multi-select delete (Notes tab) ---------- */
+const idsOf = (list) => list.map((c) => c.id);
+
+test("deleteMany removes exactly the chosen concepts and reports their ids", () => {
+  const r = deleteMany(SAMPLE_CONCEPTS, ["s1", "s3", "s7"]);
+  assert.equal(r.concepts.length, SAMPLE_CONCEPTS.length - 3);
+  assert.deepEqual(r.removedIds, ["s1", "s3", "s7"]);
+  assert.ok(!idsOf(r.concepts).some((id) => ["s1", "s3", "s7"].includes(id)));
+  assert.deepEqual(idsOf(r.concepts), idsOf(SAMPLE_CONCEPTS).filter((id) => !["s1", "s3", "s7"].includes(id))); // order kept
+});
+test("deleteMany accepts a Set, ignores unknown ids and does nothing for an empty selection", () => {
+  const r = deleteMany(SAMPLE_CONCEPTS, new Set(["s2", "nope"]));
+  assert.deepEqual(r.removedIds, ["s2"]);
+  assert.equal(r.concepts.length, SAMPLE_CONCEPTS.length - 1);
+  const none = deleteMany(SAMPLE_CONCEPTS, []);
+  assert.equal(none.concepts, SAMPLE_CONCEPTS); // same list, nothing changed
+  assert.deepEqual(none.removedIds, []);
+});
+test("deleteMany does not change the list it was given, and can empty it", () => {
+  const copy = JSON.stringify(SAMPLE_CONCEPTS);
+  const r = deleteMany(SAMPLE_CONCEPTS, idsOf(SAMPLE_CONCEPTS));
+  assert.equal(JSON.stringify(SAMPLE_CONCEPTS), copy);
+  assert.deepEqual(r.concepts, []);
+  assert.equal(r.removedIds.length, 10);
+});
+test("visibleConceptIds: 전체 shows every subject except collapsed groups; a subject filter shows just that subject", () => {
+  const all = visibleConceptIds(SAMPLE_CONCEPTS, ALL_SUBJECTS, new Set());
+  assert.equal(all.length, 10);
+  const noHistory = visibleConceptIds(SAMPLE_CONCEPTS, ALL_SUBJECTS, new Set(["한국사"]));
+  assert.deepEqual(noHistory, ["s1", "s2", "s3", "s4", "s5"]);
+  // a subject filter ignores the collapsed state (the list is shown without headers)
+  assert.deepEqual(visibleConceptIds(SAMPLE_CONCEPTS, "한국사", new Set(["한국사"])), ["s6", "s7", "s8", "s9", "s10"]);
+  assert.deepEqual(visibleConceptIds(SAMPLE_CONCEPTS, "없는과목", new Set()), []);
+});
+test("selectedVisibleIds: only selected concepts that are visible count", () => {
+  const visible = ["s1", "s2", "s3"];
+  assert.deepEqual(selectedVisibleIds(new Set(["s2", "s9", "s1"]), visible), ["s1", "s2"]); // s9 is hidden
+  assert.deepEqual(selectedVisibleIds(new Set(), visible), []);
+});
+test("toggleSelectAll: selects every visible concept, a second press clears them, hidden picks are kept", () => {
+  const visible = ["s1", "s2", "s3"];
+  const first = toggleSelectAll(new Set(["s9"]), visible);
+  assert.deepEqual([...first].sort(), ["s1", "s2", "s3", "s9"]);
+  const second = toggleSelectAll(first, visible);
+  assert.deepEqual([...second], ["s9"]); // visible ones cleared, the hidden pick stays
+  const partly = toggleSelectAll(new Set(["s1"]), visible);
+  assert.deepEqual([...partly].sort(), ["s1", "s2", "s3"]); // partly selected -> select all
+  assert.equal(toggleSelectAll(new Set(), []).size, 0); // nothing visible: nothing happens
+});
+test("select all in a subject then delete leaves the other subject untouched", () => {
+  const visible = visibleConceptIds(SAMPLE_CONCEPTS, "생명과학", new Set());
+  const picked = selectedVisibleIds(toggleSelectAll(new Set(), visible), visible);
+  const r = deleteMany(SAMPLE_CONCEPTS, picked);
+  assert.equal(r.removedIds.length, 5);
+  assert.deepEqual(listSubjects(r.concepts), [{ name: "한국사", count: 5 }]);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

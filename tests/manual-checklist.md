@@ -210,6 +210,17 @@ Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a 
 - [ ] While a PDF is being read the button is disabled; afterwards it is enabled again (also after an error).
 - [ ] Phone: the button and the hint fit on the screen, a PDF from the phone's files can be chosen.
 
+## Notes: multi-select delete (선택)
+
+- [ ] On the 노트 tab, "내 개념" has a "선택" button (disabled when there are no concepts). Pressing it turns on selection mode: it says "선택 끝내기", every row has a big checkbox instead of the 삭제 button, and "전체 선택" and "선택 삭제 (0개)" appear (the delete button is disabled at 0).
+- [ ] Tap a row (anywhere) or its checkbox: it toggles, the row is tinted, and the delete button counts "(N개)".
+- [ ] **전체 선택** with a subject chip chosen selects every concept of that subject only; pressing it again says "전체 해제" and clears them. With "전체" it selects every concept in the groups that are open; a collapsed group is NOT selected.
+- [ ] Select some, switch the subject chip: the count shows only the selected ones you can see (hidden ones are never deleted).
+- [ ] "선택 삭제 (N개)" opens the in-page dialog "N개를 삭제할까요?". "취소" (or Esc) deletes nothing and keeps the selection. "삭제" removes them, shows "N개를 삭제했어요.", leaves selection mode, and updates the counts, the subject chips and the Quiz subject list. A reload keeps the result.
+- [ ] **Edge case:** delete until a subject has fewer than 4 concepts: the Quiz tab shows the "need 4 concepts" message for it. Delete everything: the empty message shows, the "내 개념을 추가해보세요" hint comes back on the Quiz tab, and "선택" is disabled.
+- [ ] The old per-row 삭제 button still works outside selection mode.
+- [ ] Phone: the three buttons wrap and stay at least 44px tall, rows stay readable, nothing scrolls sideways.
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.

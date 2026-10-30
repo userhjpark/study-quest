@@ -2,7 +2,7 @@
 
 import { load, save } from "./storage.js";
 import {
-  SAMPLE_CONCEPTS, ALL_SUBJECTS, addConcept, addMany, deleteConcept, sanitizeConcepts,
+  SAMPLE_CONCEPTS, ALL_SUBJECTS, addConcept, addMany, deleteConcept, deleteMany, visibleConceptIds, selectedVisibleIds, toggleSelectAll, sanitizeConcepts,
   listSubjects, filterBySubject, normalizeFilter, visibleGroups, hasOwnConcepts,
 } from "./concepts.js";
 import {
@@ -81,6 +81,7 @@ const state = {
   profile: sanitizeProfile(load("profile", null)), // xp, coins, daily counters, check-in
   quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
   notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
+  select: { on: false, ids: new Set() }, // Notes multi-select: selection mode and the chosen concept ids
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
   run: freshRun(),
   focus: loadFocus(),
@@ -109,7 +110,17 @@ function refreshNotes() {
   ui.renderSubjectFilter(
     listSubjects(state.concepts), state.concepts.length, filter, ALL_SUBJECTS, handleNotesFilter
   );
+  const visible = visibleConceptIds(state.concepts, filter, state.collapsed);
+  ui.renderSelectBar({
+    selecting: state.select.on,
+    total: state.concepts.length,
+    visible: visible.length,
+    picked: selectedVisibleIds(state.select.ids, visible).length,
+  });
   ui.renderConcepts({
+    selecting: state.select.on,
+    selectedIds: state.select.ids,
+    onSelect: handleSelectItem,
     groups: visibleGroups(state.concepts, filter),
     total: state.concepts.length,
     showHeaders: filter === ALL_SUBJECTS,
@@ -117,6 +128,46 @@ function refreshNotes() {
     missed: state.missed,
     onDelete: handleDelete,
     onToggle: handleToggleGroup,
+  });
+}
+
+/* ---------- Multi-select delete ---------- */
+
+function currentVisibleIds() {
+  return visibleConceptIds(state.concepts, normalizeFilter(state.concepts, state.notesFilter), state.collapsed);
+}
+
+function handleSelectToggle() {
+  state.select = { on: !state.select.on, ids: new Set() };
+  ui.setSelectStatus("");
+  refreshNotes();
+}
+
+function handleSelectAll() {
+  state.select.ids = toggleSelectAll(state.select.ids, currentVisibleIds());
+  refreshNotes();
+}
+
+function handleSelectItem(id) {
+  if (state.select.ids.has(id)) state.select.ids.delete(id);
+  else state.select.ids.add(id);
+  refreshNotes();
+}
+
+// Asks first; only the selected concepts that are visible are deleted.
+function handleSelectDelete() {
+  const picked = selectedVisibleIds(state.select.ids, currentVisibleIds());
+  if (picked.length === 0) return;
+  ui.askDelete(picked.length, () => {
+    const result = deleteMany(state.concepts, picked);
+    state.concepts = result.concepts;
+    for (const id of result.removedIds) delete state.missed[id];
+    persist();
+    state.select = { on: false, ids: new Set() };
+    ui.setSelectStatus(`${result.removedIds.length}개를 삭제했어요.`);
+    refreshNotes();
+    refreshSubjects();
+    refreshBulk();
   });
 }
 
@@ -730,6 +781,9 @@ ui.bindEvents({
   onFocusQuiz: handleFocusQuiz,
   onFocusBack: handleFocusBack,
   onAdd: handleAdd,
+  onSelectToggle: handleSelectToggle,
+  onSelectAll: handleSelectAll,
+  onSelectDelete: handleSelectDelete,
   onBulkChange: handleBulkChange,
   onBulkSeparator: handleBulkSeparator,
   onBulkAdd: handleBulkAdd,

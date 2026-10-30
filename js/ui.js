@@ -13,6 +13,7 @@ const SUBJECT_SELECT_IDS = ["quiz-subject", "focus-subject-select", "done-subjec
 const SEP_BY_NAME = { ":": ":", "/": "/", tab: "\t" };
 
 let pendingLeave = null;
+let pendingDelete = null; // what "삭제" in the multi-delete dialog does
 let quitHandlers = null; // { onQuit, onKeep } while the quit-timer dialog is open
 
 export function bindEvents(h) {
@@ -72,6 +73,20 @@ export function bindEvents(h) {
     if (handlers) handlers.onKeep();
   });
 
+  // Notes: multi-select delete
+  $("select-toggle-btn").addEventListener("click", h.onSelectToggle);
+  $("select-all-btn").addEventListener("click", h.onSelectAll);
+  $("select-delete-btn").addEventListener("click", h.onSelectDelete);
+  const deleteDialog = $("delete-dialog");
+  $("delete-cancel-btn").addEventListener("click", () => deleteDialog.close());
+  $("delete-confirm-btn").addEventListener("click", () => {
+    const action = pendingDelete;
+    pendingDelete = null;
+    deleteDialog.close();
+    if (action) action();
+  });
+  deleteDialog.addEventListener("close", () => { pendingDelete = null; });
+
   document.querySelectorAll(".open-notes-btn").forEach((btn) => {
     btn.addEventListener("click", h.onOpenNotes);
   });
@@ -106,6 +121,12 @@ export function askLeave(onLeave) {
   $("leave-dialog").showModal();
 }
 
+export function askDelete(count, onConfirm) {
+  pendingDelete = onConfirm;
+  $("delete-title").textContent = `${count}개를 삭제할까요?`;
+  $("delete-dialog").showModal();
+}
+
 export function askQuitFocus(handlers) {
   const dialog = $("quit-focus-dialog");
   if (dialog.open) return;
@@ -130,9 +151,48 @@ export function showTab(name) {
 
 /* ---------- Notes ---------- */
 
-function createConceptItem(c, missed, onDelete) {
+// Buttons above the list. `picked` = how many visible concepts are selected, `visible` = how many
+// are shown; the "전체 선택" button turns into "전체 해제" once all visible ones are selected.
+export function renderSelectBar({ selecting, total, visible, picked }) {
+  const toggle = $("select-toggle-btn");
+  toggle.textContent = selecting ? "선택 끝내기" : "선택";
+  toggle.disabled = total === 0;
+  $("select-all-btn").hidden = !selecting;
+  $("select-all-btn").disabled = visible === 0;
+  $("select-all-btn").textContent = visible > 0 && picked === visible ? "전체 해제" : "전체 선택";
+  const del = $("select-delete-btn");
+  del.hidden = !selecting;
+  del.disabled = picked === 0;
+  del.textContent = `선택 삭제 (${picked}개)`;
+}
+
+export function setSelectStatus(message) {
+  $("select-status").textContent = message || "";
+}
+
+function createConceptItem(c, missed, onDelete, pick) {
   const li = document.createElement("li");
   li.className = "concept-item";
+
+  if (pick.selecting) {
+    // Selection mode: a checkbox in front, the whole row toggles it, and there is no 삭제 button.
+    const label = document.createElement("label");
+    label.className = "pick";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = pick.selectedIds.has(c.id);
+    box.setAttribute("aria-label", `${c.term} 선택`);
+    box.addEventListener("change", () => pick.onSelect(c.id));
+    label.append(box);
+    li.classList.add("is-selectable");
+    li.classList.toggle("is-selected", box.checked);
+    li.append(label);
+    li.addEventListener("click", (e) => {
+      if (e.target === box || label.contains(e.target)) return; // the checkbox handles its own click
+      box.checked = !box.checked;
+      pick.onSelect(c.id);
+    });
+  }
 
   const text = document.createElement("div");
   text.className = "concept-text";
@@ -163,7 +223,8 @@ function createConceptItem(c, missed, onDelete) {
   del.setAttribute("aria-label", `${c.term} 삭제`);
   del.addEventListener("click", () => onDelete(c.id));
 
-  li.append(text, del);
+  li.append(text);
+  if (!pick.selecting) li.append(del);
   return li;
 }
 
@@ -186,7 +247,10 @@ export function renderSubjectFilter(subjects, total, selected, allValue, onSelec
 
 // groups: [{ name, concepts }]. With showHeaders (the "전체" view) each group gets a header
 // "과목 (개수)" that collapses or expands it; `collapsed` is the set of collapsed subject names.
-export function renderConcepts({ groups, total, showHeaders, collapsed, missed, onDelete, onToggle }) {
+export function renderConcepts({
+  groups, total, showHeaders, collapsed, missed, onDelete, onToggle, selecting = false, selectedIds = new Set(), onSelect = () => {},
+}) {
+  const pick = { selecting, selectedIds, onSelect };
   $("concept-count").textContent = String(total);
   const box = $("concept-groups");
   box.replaceChildren();
@@ -224,7 +288,7 @@ export function renderConcepts({ groups, total, showHeaders, collapsed, missed, 
     if (!isCollapsed) {
       const list = document.createElement("ul");
       list.className = "concept-list";
-      for (const c of group.concepts) list.append(createConceptItem(c, missed, onDelete));
+      for (const c of group.concepts) list.append(createConceptItem(c, missed, onDelete, pick));
       section.append(list);
     }
     box.append(section);
