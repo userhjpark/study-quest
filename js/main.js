@@ -371,6 +371,7 @@ function rewardMessage(gained, checkIn, levelUp) {
 function refreshCharacter() {
   const { character, shop } = state;
   charUi.renderHeaderAvatar(character);
+  charUi.renderFocusAvatar(character); // the bigger picture next to the timer
   charUi.renderCharacterTab({
     character, coins: state.profile.coins, category: shop.category, previewId: shop.previewId,
     message: shop.message, good: shop.good,

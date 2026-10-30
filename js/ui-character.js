@@ -65,8 +65,8 @@ export function createAvatar(character, size = null) {
   }
   const shapes = drawCharacter(character);
   if (shapes.length === 0) {
-    svg.append(svgElement("circle", { cx: 100, cy: 100, r: 78, fill: "#e6e1fb", stroke: "#b9b0ee", "stroke-width": 4, "stroke-dasharray": "10 8" }));
-    const mark = svgElement("text", { x: 100, y: 128, "text-anchor": "middle", "font-size": 90, "font-weight": 700, fill: "#8a7fd6" });
+    svg.append(svgElement("circle", { cx: 100, cy: 100, r: 78, fill: "#ffe3c2", stroke: "#f0b676", "stroke-width": 4, "stroke-dasharray": "10 8" }));
+    const mark = svgElement("text", { x: 100, y: 128, "text-anchor": "middle", "font-size": 90, "font-weight": 700, fill: "#d98a2e" });
     mark.textContent = "?";
     svg.append(mark);
     return svg;
@@ -94,6 +94,11 @@ export function bindCharacterEvents(h) {
 }
 
 // The small avatar in the header always shows what is really worn (never the try-on).
+// The same picture, bigger, next to the timer on the 집중 tab.
+export function renderFocusAvatar(character) {
+  $("focus-avatar").replaceChildren(createAvatar(character));
+}
+
 export function renderHeaderAvatar(character) {
   $("header-avatar").replaceChildren(createAvatar(character));
 }

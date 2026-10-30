@@ -221,6 +221,21 @@ Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a 
 - [ ] The old per-row 삭제 button still works outside selection mode.
 - [ ] Phone: the three buttons wrap and stay at least 44px tall, rows stay readable, nothing scrolls sideways.
 
+## Visual refresh ("cute animal friends", Oct 30)
+
+Hard refresh first (Ctrl+Shift+R). Needs internet for the fonts (Jua for headings, Noto Sans KR for text); offline the system Korean font is used and everything still works. No logic changed, so also check that things still work, not only how they look.
+
+- [ ] **Overall:** white page, warm apricot (#F9A03F) buttons with dark brown text, teal progress bars. **No purple anywhere** (header, tabs, buttons, chips, the "?" avatar before you pick an animal, shop highlight). Headings, the timer digits and the result line use the round Jua font.
+- [ ] **Header:** white, "Study Quest" in orange-brown Jua, a cream profile strip with a bigger (64px) avatar, teal XP bar, apricot "출석 체크" button (turns white/grey once done). Tabs are pills: cream, the active one apricot with a darker edge. The dot on a tab (finished timer / no animal yet) is visible on both states.
+- [ ] **집중:** your character (about 96px, in a cream circle) is at the top on the start screen, while the timer runs, when paused, and on the "집중 완료!" screen; it shows what you wear and updates after you change outfit. The "오늘의 공부" summary is a soft cream panel; the duration buttons are big cream pills; the one "시작" button is apricot. Timer digits are big and orange-brown; the progress bar is teal.
+- [ ] **노트:** not a stack of white boxes: sections are separated by thin lines. "개념 추가" is the big apricot button; the "여러 개 한 번에 추가 (PDF 가능)" title is a Jua heading; the PDF box is cream with an apricot dashed border. Subject chips: the chosen one is apricot with dark text. Group headers are cream. Selection mode (선택): tinted cream rows, teal checkboxes, red "선택 삭제".
+- [ ] **퀴즈:** "퀴즈 시작" is the big apricot button; the question is large; answer options are big white buttons (at least 52px) and turn green/red when answered; the result screen's "N문제 중 M문제 정답" is large Jua; the reward line is green (red/pink when capped). "최근 기록" is a plain list.
+- [ ] **캐릭터:** the preview sits on a cream rounded square; shop items are rounded white cards; the item being tried on has an apricot border and cream background; owned/equipped stay green.
+- [ ] **Dialogs** (leave quiz, quit timer, delete): rounded, brown dimmed backdrop, the main button apricot (delete = red).
+- [ ] **Text is readable** everywhere (dark brown on white or cream, no pale grey-on-white), buttons are at least 44px tall, the keyboard focus ring (Tab key) is a teal outline.
+- [ ] **Phone width (about 375px):** no sideways scrolling on any tab, the profile strip and the tabs fit on one row each, the 4 tabs are all tappable, the character on 집중 does not push the timer buttons off screen.
+- [ ] Gallery page `tests/avatar-gallery.html` still works (it keeps its own simple styling).
+
 ## Phone
 
 - [ ] On the phone (or DevTools phone mode): no sideways scrolling, buttons and the subject dropdown are easy to tap, Korean text wraps properly, the preview list scrolls inside its box.
