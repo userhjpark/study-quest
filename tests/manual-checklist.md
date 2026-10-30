@@ -221,20 +221,27 @@ Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a 
 - [ ] The old per-row 삭제 button still works outside selection mode.
 - [ ] Phone: the three buttons wrap and stay at least 44px tall, rows stay readable, nothing scrolls sideways.
 
-## Visual refresh ("cute animal friends", Oct 30)
+## Visual refresh, round 2: font, off-white page, dark mode, timer ring
 
-Hard refresh first (Ctrl+Shift+R). Needs internet for the fonts (Jua for headings, Noto Sans KR for text); offline the system Korean font is used and everything still works. No logic changed, so also check that things still work, not only how they look.
+Hard refresh first (Ctrl+Shift+R). Do the checks below once in LIGHT and once in DARK mode (🌙/☀️ button in the header). Fonts need internet; offline the system Korean font is used. No game logic changed, so also check that things still work.
 
-- [ ] **Overall:** white page, warm apricot (#F9A03F) buttons with dark brown text, teal progress bars. **No purple anywhere** (header, tabs, buttons, chips, the "?" avatar before you pick an animal, shop highlight). Headings, the timer digits and the result line use the round Jua font.
-- [ ] **Header:** white, "Study Quest" in orange-brown Jua, a cream profile strip with a bigger (64px) avatar, teal XP bar, apricot "출석 체크" button (turns white/grey once done). Tabs are pills: cream, the active one apricot with a darker edge. The dot on a tab (finished timer / no animal yet) is visible on both states.
-- [ ] **집중:** your character (about 96px, in a cream circle) is at the top on the start screen, while the timer runs, when paused, and on the "집중 완료!" screen; it shows what you wear and updates after you change outfit. The "오늘의 공부" summary is a soft cream panel; the duration buttons are big cream pills; the one "시작" button is apricot. Timer digits are big and orange-brown; the progress bar is teal.
-- [ ] **노트:** not a stack of white boxes: sections are separated by thin lines. "개념 추가" is the big apricot button; the "여러 개 한 번에 추가 (PDF 가능)" title is a Jua heading; the PDF box is cream with an apricot dashed border. Subject chips: the chosen one is apricot with dark text. Group headers are cream. Selection mode (선택): tinted cream rows, teal checkboxes, red "선택 삭제".
-- [ ] **퀴즈:** "퀴즈 시작" is the big apricot button; the question is large; answer options are big white buttons (at least 52px) and turn green/red when answered; the result screen's "N문제 중 M문제 정답" is large Jua; the reward line is green (red/pink when capped). "최근 기록" is a plain list.
-- [ ] **캐릭터:** the preview sits on a cream rounded square; shop items are rounded white cards; the item being tried on has an apricot border and cream background; owned/equipped stay green.
-- [ ] **Dialogs** (leave quiz, quit timer, delete): rounded, brown dimmed backdrop, the main button apricot (delete = red).
-- [ ] **Text is readable** everywhere (dark brown on white or cream, no pale grey-on-white), buttons are at least 44px tall, the keyboard focus ring (Tab key) is a teal outline.
-- [ ] **Phone width (about 375px):** no sideways scrolling on any tab, the profile strip and the tabs fit on one row each, the 4 tabs are all tappable, the character on 집중 does not push the timer buttons off screen.
-- [ ] Gallery page `tests/avatar-gallery.html` still works (it keeps its own simple styling).
+**Font and background (light)**
+- [ ] Everything uses one font (IBM Plex Sans KR): bold headings, logo, timer digits and result line; regular/medium body text. No leftover rounded Jua look.
+- [ ] The page is a soft warm off-white (not pure white); inputs, answer options, dialogs and shop items are slightly lighter than the page; the cream panels (today summary, PDF box, profile strip) still stand out. Text is easy to read; no purple anywhere.
+
+**Dark mode**
+- [ ] First load follows the system setting (switch your OS/browser to dark and reload; with no saved choice the page is dark). The 🌙/☀️ button shows the opposite of what is shown (🌙 in light, ☀️ in dark).
+- [ ] Press the button: the whole page switches at once; reload keeps the choice (also when it differs from the system setting); there is no white flash on reload.
+- [ ] **Look through every tab in dark:** header and profile strip, tabs (active one stays apricot with dark text), forms and inputs (typed text readable, native dropdowns and checkboxes dark), note list and subject chips, selection mode, PDF box (cream-dark with an apricot dashed edge) and its guide text, quiz question and options, **correct = green and wrong = red/salmon** still clear on dark, result and reward lines (green; the XP-cap warning in red), 최근 기록, character tab and shop, all three dialogs.
+- [ ] **Character:** the avatar always sits on a light round/square background so outlines are visible; the "?" placeholder (before you pick an animal) looks right; items like the black sunglasses or dark hats are visible.
+- [ ] Text contrast is comfortable everywhere (no dim grey-on-dark); the grey technical PDF error line is still readable.
+
+**Timer ring (both modes)**
+- [ ] Start a 1-minute timer: a circular ring with big digits in the middle and "집중하는 중" above them; your character is next to the ring (below it on a very narrow phone). The coloured arc starts as a full circle and shrinks smoothly, once a second, as time passes. The digits do not wobble.
+- [ ] "그만하기 (보너스 없음)" pauses: the arc turns grey, the digits dim, the dialog "집중을 그만할까요?" appears; "계속하기" resumes from the remaining time (arc shrinks again); "그만하기" ends it with no bonus.
+- [ ] Reload during a running timer: the ring shows the right remaining arc at once. When time is up the "집중 완료!" screen shows your character; start/finish screens still work.
+- [ ] **Reduced motion:** turn on "reduce motion" in the OS (or DevTools > Rendering > Emulate prefers-reduced-motion): the arc jumps instead of sweeping, buttons do not move when pressed. The timer still works.
+- [ ] Phone width (about 375px): the ring and the character fit side by side or wrap neatly, nothing scrolls sideways, the theme button (48px) sits next to the logo.
 
 ## Phone
 

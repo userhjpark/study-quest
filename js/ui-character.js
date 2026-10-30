@@ -96,7 +96,7 @@ export function bindCharacterEvents(h) {
 // The small avatar in the header always shows what is really worn (never the try-on).
 // The same picture, bigger, next to the timer on the 집중 tab.
 export function renderFocusAvatar(character) {
-  $("focus-avatar").replaceChildren(createAvatar(character));
+  document.querySelectorAll(".focus-avatar").forEach((el) => el.replaceChildren(createAvatar(character)));
 }
 
 export function renderHeaderAvatar(character) {

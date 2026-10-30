@@ -74,6 +74,7 @@ export function bindEvents(h) {
   });
 
   // Notes: multi-select delete
+  $("theme-btn").addEventListener("click", h.onThemeToggle);
   $("select-toggle-btn").addEventListener("click", h.onSelectToggle);
   $("select-all-btn").addEventListener("click", h.onSelectAll);
   $("select-delete-btn").addEventListener("click", h.onSelectDelete);
@@ -586,6 +587,17 @@ export function setCheckInNote(message) {
 const BASE_TITLE = document.title;
 
 // phase: "idle" (choose a length) | "running" | "done" (finished, bonus shown)
+// Light/dark button. `theme` is what is shown now; `explicit` is true once the user has chosen
+// (otherwise the CSS follows the system setting and no data-theme is set).
+export function showTheme(theme, explicit) {
+  const root = document.documentElement;
+  if (explicit) root.setAttribute("data-theme", theme);
+  else root.removeAttribute("data-theme");
+  const btn = $("theme-btn");
+  btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  btn.setAttribute("aria-label", theme === "dark" ? "밝은 화면으로 바꾸기" : "어두운 화면으로 바꾸기");
+}
+
 export function showFocus(phase) {
   $("focus-idle").hidden = phase !== "idle";
   $("focus-running").hidden = phase !== "running";
@@ -605,8 +617,10 @@ export function renderTimer(timeText, fraction, paused) {
   $("focus-cancel-btn").hidden = paused;
   $("focus-paused-actions").hidden = !paused;
   $("focus-time").textContent = timeText;
-  $("focus-fill").style.width = `${percent}%`;
-  $("focus-bar").setAttribute("aria-valuenow", String(percent));
+  // The ring shows what is LEFT: the arc is pathLength 100, so the dash offset is the elapsed part.
+  $("focus-arc").style.strokeDashoffset = String(Math.min(100, Math.max(0, fraction * 100)));
+  $("focus-arc").style.visibility = fraction >= 1 ? "hidden" : "visible";
+  $("focus-ring").setAttribute("aria-valuenow", String(percent));
   document.title = `${paused ? "일시정지 " : ""}${timeText} · ${BASE_TITLE}`;
 }
 

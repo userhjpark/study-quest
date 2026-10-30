@@ -12,6 +12,7 @@ import {
   PDF_MAX_BYTES, PDF_MAX_PAGES, PDF_MESSAGES, checkPdfFile, checkPageCount, looksScanned,
   rebuildLines, pagesToText, appendText,
 } from "../js/pdf-text.js";
+import { sanitizeTheme, effectiveTheme, otherTheme } from "../js/theme.js";
 import { detectSeparator, parseLines, buildPreview, MAX_IMPORT } from "../js/importer.js";
 import {
   canStartQuiz, pickOptions, weightOf, recordAnswer, buildRound, buildRetry, nextStep, progressLabel,
@@ -1770,6 +1771,25 @@ test("select all in a subject then delete leaves the other subject untouched", (
   const r = deleteMany(SAMPLE_CONCEPTS, picked);
   assert.equal(r.removedIds.length, 5);
   assert.deepEqual(listSubjects(r.concepts), [{ name: "한국사", count: 5 }]);
+});
+
+/* ---------- Light / dark theme choice ---------- */
+test("theme: only light and dark are accepted, anything else means no choice", () => {
+  assert.equal(sanitizeTheme("dark"), "dark");
+  assert.equal(sanitizeTheme("light"), "light");
+  for (const bad of [null, undefined, "", "blue", 1, {}, "Dark"]) assert.equal(sanitizeTheme(bad), null);
+});
+test("theme: a saved choice wins over the system setting; without one the system decides", () => {
+  assert.equal(effectiveTheme("light", true), "light");
+  assert.equal(effectiveTheme("dark", false), "dark");
+  assert.equal(effectiveTheme(null, true), "dark");
+  assert.equal(effectiveTheme(null, false), "light");
+  assert.equal(effectiveTheme("broken", true), "dark"); // damaged saved value = no choice
+});
+test("theme: the button switches to the other theme (also when following a dark system)", () => {
+  assert.equal(otherTheme("dark"), "light");
+  assert.equal(otherTheme("light"), "dark");
+  assert.equal(otherTheme(effectiveTheme(null, true)), "light");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

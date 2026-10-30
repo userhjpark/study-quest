@@ -17,6 +17,7 @@ import {
   startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer, parseMinutes,
 } from "./timer.js";
 import { readPdfText, PdfError } from "./pdf-reader.js";
+import { sanitizeTheme, effectiveTheme, otherTheme } from "./theme.js";
 import { appendText } from "./pdf-text.js";
 import { buildRoundRecord, addRecord, withPaidXp, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
@@ -81,6 +82,7 @@ const state = {
   profile: sanitizeProfile(load("profile", null)), // xp, coins, daily counters, check-in
   quizSubject: loadText("quizSubject", ALL_SUBJECTS), // a subject name or ALL_SUBJECTS
   notesFilter: loadText("notesFilter", ALL_SUBJECTS), // subject shown in the Notes list, or ALL_SUBJECTS
+  theme: sanitizeTheme(load("theme", null)), // "light", "dark", or null = follow the system
   select: { on: false, ids: new Set() }, // Notes multi-select: selection mode and the chosen concept ids
   collapsed: loadCollapsed(), // subjects whose group is collapsed in the Notes "전체" view
   run: freshRun(),
@@ -130,6 +132,22 @@ function refreshNotes() {
     onToggle: handleToggleGroup,
   });
 }
+
+/* ---------- Light / dark ---------- */
+
+const systemDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+function refreshTheme() {
+  ui.showTheme(effectiveTheme(state.theme, systemDark ? systemDark.matches : false), state.theme !== null);
+}
+
+function handleThemeToggle() {
+  state.theme = otherTheme(effectiveTheme(state.theme, systemDark ? systemDark.matches : false));
+  save("theme", state.theme);
+  refreshTheme();
+}
+
+if (systemDark && systemDark.addEventListener) systemDark.addEventListener("change", refreshTheme);
 
 /* ---------- Multi-select delete ---------- */
 
@@ -782,6 +800,7 @@ ui.bindEvents({
   onFocusQuiz: handleFocusQuiz,
   onFocusBack: handleFocusBack,
   onAdd: handleAdd,
+  onThemeToggle: handleThemeToggle,
   onSelectToggle: handleSelectToggle,
   onSelectAll: handleSelectAll,
   onSelectDelete: handleSelectDelete,
@@ -811,6 +830,7 @@ refreshProfile();
 resetQuiz();
 refreshFocus();
 refreshCharacter();
+refreshTheme();
 if (state.focus.phase === "running") {
   tickTimer(); // may already be over (page closed while it ran): then the finish screen shows
   if (state.focus.phase === "running" && !isPaused(state.focus.timer)) startTicking();
