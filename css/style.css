@@ -104,7 +104,13 @@ h1, h2, h3 { font-weight: 700; }
   border-bottom: 1px solid var(--border);
 }
 .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.app-header h1 { margin: 0; font-size: 1.7rem; color: var(--primary-ink); }
+.app-header h1 { margin: 0; font-size: 1.7rem; line-height: 1.2; color: var(--primary-ink); }
+.tagline { margin: 2px 0 0; font-size: 0.9rem; color: var(--muted); }
+.pet-line { margin: 4px 0 12px; text-align: center; font-weight: 700; color: var(--primary-ink); }
+.pet-line:empty { display: none; }
+.pet-name-form { margin-top: 8px; }
+.pet-name-form label, #char-first-actions label { text-align: center; }
+#char-first-actions input { text-align: center; }
 .theme-btn {
   flex: none;
   width: var(--tap);

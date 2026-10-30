@@ -3,6 +3,8 @@
 // changing the old one. Coins live in the profile (rewards.js): buying takes the current coins
 // and returns the new amount, and main.js stores both.
 
+import { checkPetName, repairPetName } from "./pet-name.js";
+
 export const ANIMAL_PRICE = 60; // the first animal is free, the others cost this
 
 export const ANIMALS = [
@@ -58,7 +60,7 @@ function emptyEquipped() {
 }
 
 export function freshCharacter() {
-  return { animal: null, ownedAnimals: [], ownedItems: [], equipped: emptyEquipped() };
+  return { animal: null, name: "", ownedAnimals: [], ownedItems: [], equipped: emptyEquipped() };
 }
 
 // True once the user has picked the free first animal.
@@ -79,11 +81,28 @@ export function isEquipped(character, id) {
 
 /* ---------- Getting things ---------- */
 
-// The free first animal. Only works while no animal is owned yet.
-export function pickFirstAnimal(character, id) {
+// The free first animal. Only works while no animal is owned yet. `petName` is optional (empty =
+// the animal's own name is used); a name that is too long is an error and nothing changes.
+export function pickFirstAnimal(character, id, petName = "") {
   if (!findAnimal(id)) return { character, error: "알 수 없는 동물이에요." };
   if (character.ownedAnimals.length > 0) return { character, error: "이미 친구를 골랐어요." };
-  return { character: { ...character, animal: id, ownedAnimals: [id] }, error: null };
+  const named = checkPetName(petName);
+  if (named.error) return { character, error: named.error };
+  return { character: { ...character, animal: id, name: named.name, ownedAnimals: [id] }, error: null };
+}
+
+// The name shown for the pet: the name the user gave, or the animal's own name. "" while no
+// animal has been chosen. The name belongs to the pet, so it stays when another animal is worn.
+export function petName(character) {
+  return character.name || findAnimal(character.animal)?.name || "";
+}
+
+// Changes the name later. Empty = back to the animal's own name.
+export function renamePet(character, text) {
+  if (!hasAnimal(character)) return { character, error: "먼저 함께할 친구를 골라 주세요." };
+  const named = checkPetName(text);
+  if (named.error) return { character, error: named.error };
+  return { character: { ...character, name: named.name }, error: null };
 }
 
 export function notEnoughCoinsMessage(price, coins) {
@@ -180,5 +199,5 @@ export function sanitizeCharacter(raw) {
     const item = findItem(saved[slot]);
     if (item && item.slot === slot && ownedItems.includes(item.id)) equipped[slot] = item.id;
   }
-  return { animal, ownedAnimals, ownedItems, equipped };
+  return { animal, name: repairPetName(c.name), ownedAnimals, ownedItems, equipped };
 }

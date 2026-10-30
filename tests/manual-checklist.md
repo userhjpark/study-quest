@@ -78,7 +78,7 @@ The UI is in Korean. The page opens on the 집중 tab; for the Stage 1 items bel
 
 Use clean data for the first items (private window or "Clear site data").
 
-- [ ] Header (under "Study Quest") shows "Lv 1", an XP bar with "0/100 XP", "코인 0", "연속 0일", "오늘 0/600 XP" and a "출석 체크" button.
+- [ ] Header (under "Study with Pet") shows "Lv 1", an XP bar with "0/100 XP", "코인 0", "연속 0일", "오늘 0/600 XP" and a "출석 체크" button.
 - [ ] **Button check-in:** tap "출석 체크": the note says "출석 완료! 연속 1일 · +10 XP, +6 코인", the button becomes the disabled "출석 완료", coins 6, XP 10. After a reload it stays disabled. The "오늘" line stays at 0 (check-in XP is outside the daily cap).
 - [ ] **Automatic check-in:** with clean data (button NOT pressed), finish a quiz round. The result screen shows the reward line ("+N XP, +N 코인") and a second line "출석 체크 완료! 연속 1일 · +10 XP, +6 코인". The header button now says "출석 완료".
 - [ ] **No double bonus (button first):** after pressing the button, finish a round: no "출석 체크 완료" line on the result screen, and XP/coins grow only by the round's reward.
@@ -242,6 +242,16 @@ Hard refresh first (Ctrl+Shift+R). Do the checks below once in LIGHT and once in
 - [ ] Reload during a running timer: the ring shows the right remaining arc at once. When time is up the "집중 완료!" screen shows your character; start/finish screens still work.
 - [ ] **Reduced motion:** turn on "reduce motion" in the OS (or DevTools > Rendering > Emulate prefers-reduced-motion): the arc jumps instead of sweeping, buttons do not move when pressed. The timer still works.
 - [ ] Phone width (about 375px): the ring and the character fit side by side or wrap neatly, nothing scrolls sideways, the theme button (48px) sits next to the logo.
+
+## Rename to "Study with Pet" and the pet's name
+
+- [ ] **Rename:** the header logo and the browser tab title say "Study with Pet"; under the logo the small line "펫이랑 같이 공부해요". The repository name and the URL are unchanged.
+- [ ] **First pick:** with no animal chosen, tap an animal: under the picture "이름을 지어주세요 (선택, 최대 10자)" with the placeholder "예: 감자, 콩이" and the button "이 친구로 시작하기 (무료)". Start with an empty name: the pet is called by the animal's name ("고양이, 잘 부탁해요!"). Start another time (clear the character with the console or a fresh profile) with the name "감자": "감자, 잘 부탁해요!" and the caption "감자 · 고양이".
+- [ ] **Name rules:** the field stops at 10 characters; spaces around the name are removed ("  감자  " becomes "감자"); a name of spaces only counts as empty.
+- [ ] **Rename later:** on the 캐릭터 tab a form "이름" with the current name and "저장". Save "별": caption "별 · …" and the message "이름을 바꿨어요!". Save an empty name: it goes back to the animal's name. The header avatar and other things are unchanged. A reload keeps the name. Buying/wearing another animal keeps the name.
+- [ ] **Where the name shows:** 집중 start screen "감자랑 같이 집중해 볼까요?"; while the timer runs (and when paused) "감자랑 같이 25분 집중!" under the ring; 집중 완료 screen "감자가 기뻐해요!"; quiz result "감자가 기뻐해요!" (or "감자가 곁에서 응원해요!" if every answer was wrong). Without a chosen animal none of these lines show.
+- [ ] **Particles:** name the pet "감자" and see "감자랑" / "감자가"; rename it "별": "별이랑" / "별이" (the name ending in a consonant gets 이랑 and 이); "콩": "콩이랑" / "콩이"; "별이": "별이랑" / "별이가"; "Coco": "Coco랑" / "Coco가".
+- [ ] Both light and dark mode, and phone width: the tagline fits next to the theme button, the name field and the lines do not overflow.
 
 ## Phone
 

@@ -461,12 +461,13 @@ export function showQuizStart(canStart) {
   $("start-btn").disabled = !canStart;
 }
 
-export function showResult({ correct, total, missedTerms, retryTotal, retryCorrect }, reward) {
+export function showResult({ correct, total, missedTerms, retryTotal, retryCorrect }, reward, petLine = "") {
   showQuizPart("result");
   const rewardEl = $("result-reward");
   rewardEl.textContent = reward.text;
   rewardEl.classList.toggle("is-capped", reward.capped);
   $("result-checkin").textContent = reward.checkInText;
+  $("result-pet").textContent = petLine;
   $("result-correct").textContent = `${total}문제 중 ${correct}문제 정답`;
   const retry = $("result-retry");
   retry.hidden = retryTotal === 0;
@@ -596,6 +597,13 @@ export function showTheme(theme, explicit) {
   const btn = $("theme-btn");
   btn.textContent = theme === "dark" ? "☀️" : "🌙";
   btn.setAttribute("aria-label", theme === "dark" ? "밝은 화면으로 바꾸기" : "어두운 화면으로 바꾸기");
+}
+
+// The lines with the pet's name on the 집중 tab ("" hides a line).
+export function setFocusPetLines({ idle, running, done }) {
+  $("focus-idle-line").textContent = idle;
+  $("focus-pet-line").textContent = running;
+  $("focus-done-line").textContent = done;
 }
 
 export function showFocus(phase) {

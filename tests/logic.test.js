@@ -12,6 +12,10 @@ import {
   PDF_MAX_BYTES, PDF_MAX_PAGES, PDF_MESSAGES, checkPdfFile, checkPageCount, looksScanned,
   rebuildLines, pagesToText, appendText,
 } from "../js/pdf-text.js";
+import {
+  MAX_PET_NAME, cleanPetName, checkPetName, repairPetName, hasBatchim, withParticle,
+  focusIdleLine, focusRunningLine, focusDoneLine, quizResultLine,
+} from "../js/pet-name.js";
 import { sanitizeTheme, effectiveTheme, otherTheme } from "../js/theme.js";
 import { detectSeparator, parseLines, buildPreview, MAX_IMPORT } from "../js/importer.js";
 import {
@@ -38,7 +42,7 @@ import {
 
 import {
   ANIMAL_PRICE, ANIMALS, SLOTS, CATEGORIES, ITEMS, findAnimal, findItem, freshCharacter, hasAnimal,
-  isOwned, isEquipped, pickFirstAnimal, buy, equip, unequipSlot, previewCharacter, sanitizeCharacter,
+  isOwned, isEquipped, pickFirstAnimal, petName, renamePet, buy, equip, unequipSlot, previewCharacter, sanitizeCharacter,
   notEnoughCoinsMessage,
   shopEntries, shopStatus, wearOrTakeOff,
 } from "../js/character.js";
@@ -1790,6 +1794,134 @@ test("theme: the button switches to the other theme (also when following a dark 
   assert.equal(otherTheme("dark"), "light");
   assert.equal(otherTheme("light"), "dark");
   assert.equal(otherTheme(effectiveTheme(null, true)), "light");
+});
+
+/* ---------- Pet name ---------- */
+test("pet name: trimmed, inner spaces collapsed, line breaks and control characters removed", () => {
+  assert.equal(cleanPetName("  감자  "), "감자");
+  assert.equal(cleanPetName("큰   감자"), "큰 감자");
+  assert.equal(cleanPetName("감\n자\t콩"), "감 자 콩");
+  assert.equal(cleanPetName("\u0000콩이\u0007"), "콩이");
+  assert.equal(cleanPetName(null), "");
+  assert.equal(cleanPetName(undefined), "");
+});
+test("pet name: empty is allowed (the animal's name is used), 10 characters are fine, 11 are an error", () => {
+  assert.deepEqual(checkPetName(""), { name: "", error: null });
+  assert.deepEqual(checkPetName("   "), { name: "", error: null });
+  assert.deepEqual(checkPetName(" 감자 "), { name: "감자", error: null });
+  assert.equal(MAX_PET_NAME, 10);
+  assert.equal(checkPetName("가나다라마바사아자차").error, null); // exactly 10
+  assert.match(checkPetName("가나다라마바사아자차카").error, /10자/); // 11
+  assert.equal(checkPetName("가나다라마바사아자차카").name, ""); // nothing usable comes back with an error
+  assert.match(checkPetName("  가나다라마바사아자차카  ").error, /10자/); // spaces are trimmed first, then counted
+  assert.equal(checkPetName("  가나다라마바사아자차  ").error, null);
+});
+test("pet name: an emoji counts as one character", () => {
+  assert.equal(checkPetName("🐱".repeat(10)).error, null);
+  assert.match(checkPetName("🐱".repeat(11)).error, /10자/);
+});
+test("pet name: repairPetName cuts edited saved data to something usable", () => {
+  assert.equal(repairPetName("감자"), "감자");
+  assert.equal(repairPetName("  감자 "), "감자");
+  assert.equal(repairPetName("가나다라마바사아자차카타"), "가나다라마바사아자차");
+  for (const bad of [null, undefined, 5, {}, []]) assert.equal(repairPetName(bad), "");
+});
+test("particles: 받침 is decoded from the last Hangul letter", () => {
+  assert.equal(hasBatchim("감자"), false); // 자
+  assert.equal(hasBatchim("별"), true); // ㄹ
+  assert.equal(hasBatchim("콩"), true); // ㅇ
+  assert.equal(hasBatchim("콩이"), false);
+  assert.equal(hasBatchim("고양이"), false);
+  assert.equal(hasBatchim("햄스터"), false);
+  assert.equal(hasBatchim("카피바라"), false);
+  assert.equal(hasBatchim("강아지"), false);
+  assert.equal(hasBatchim("밤"), true);
+  assert.equal(hasBatchim(""), false);
+});
+test("particles: 랑 / 이랑 and 가 / 이", () => {
+  assert.equal(withParticle("감자", "and"), "감자랑");
+  assert.equal(withParticle("감자", "subject"), "감자가");
+  assert.equal(withParticle("별이", "and"), "별이랑");
+  assert.equal(withParticle("별이", "subject"), "별이가");
+  assert.equal(withParticle("별", "and"), "별이랑");
+  assert.equal(withParticle("별", "subject"), "별이");
+  assert.equal(withParticle("콩", "and"), "콩이랑");
+  assert.equal(withParticle("콩", "subject"), "콩이");
+  assert.equal(withParticle("고양이", "and"), "고양이랑");
+  assert.equal(withParticle("햄스터", "subject"), "햄스터가");
+  assert.equal(withParticle("카피바라", "and"), "카피바라랑");
+});
+test("particles: digits, Latin names and trailing punctuation", () => {
+  assert.equal(withParticle("2호", "subject"), "2호가"); // 호: no 받침
+  assert.equal(withParticle("공3", "subject"), "공3이"); // 삼
+  assert.equal(withParticle("공2", "and"), "공2랑"); // 이
+  assert.equal(withParticle("Coco", "and"), "Coco랑");
+  assert.equal(withParticle("Ball", "subject"), "Ball이"); // l = 엘
+  assert.equal(withParticle("Tom", "and"), "Tom이랑"); // m = 엠
+  assert.equal(withParticle("감자!", "and"), "감자!랑"); // punctuation is skipped when judging
+  assert.equal(withParticle("별~", "subject"), "별~이");
+  assert.equal(withParticle("🐱", "and"), "🐱랑");
+});
+test("pet lines use the name with the right particle, and are empty without a name", () => {
+  assert.equal(focusRunningLine("감자", 25), "감자랑 같이 25분 집중!");
+  assert.equal(focusRunningLine("별", 10), "별이랑 같이 10분 집중!");
+  assert.equal(focusDoneLine("감자"), "감자가 기뻐해요!");
+  assert.equal(focusDoneLine("별"), "별이 기뻐해요!");
+  assert.equal(focusIdleLine("콩이"), "콩이랑 같이 집중해 볼까요?");
+  assert.equal(quizResultLine("감자", 3), "감자가 기뻐해요!");
+  assert.equal(quizResultLine("감자", 0), "감자가 곁에서 응원해요!");
+  assert.equal(quizResultLine("별", 5), "별이 기뻐해요!");
+  for (const line of [focusIdleLine(""), focusRunningLine("", 5), focusDoneLine(""), quizResultLine("", 4)]) assert.equal(line, "");
+});
+
+/* ---------- Pet name in the character data ---------- */
+test("a new character has no name; the first pick can give one", () => {
+  assert.equal(freshCharacter().name, "");
+  const r = pickFirstAnimal(freshCharacter(), "cat", " 감자 ");
+  assert.equal(r.error, null);
+  assert.equal(r.character.name, "감자");
+  assert.equal(r.character.animal, "cat");
+  assert.equal(pickFirstAnimal(freshCharacter(), "cat").character.name, ""); // optional
+});
+test("a name that is too long stops the first pick and changes nothing", () => {
+  const before = freshCharacter();
+  const r = pickFirstAnimal(before, "dog", "가나다라마바사아자차카");
+  assert.match(r.error, /10자/);
+  assert.equal(r.character, before);
+  assert.equal(hasAnimal(r.character), false);
+});
+test("petName: the given name, or the animal's own name, or nothing without an animal", () => {
+  assert.equal(petName(freshCharacter()), "");
+  assert.equal(petName(pickFirstAnimal(freshCharacter(), "cat").character), "고양이");
+  assert.equal(petName(pickFirstAnimal(freshCharacter(), "capybara").character), "카피바라");
+  assert.equal(petName(pickFirstAnimal(freshCharacter(), "cat", "감자").character), "감자");
+});
+test("renamePet: change, clear back to the animal's name, reject too long, needs an animal", () => {
+  const c = pickFirstAnimal(freshCharacter(), "hamster", "콩이").character;
+  const renamed = renamePet(c, "  별  ");
+  assert.equal(renamed.error, null);
+  assert.equal(renamed.character.name, "별");
+  assert.equal(petName(renamePet(renamed.character, "").character), "햄스터"); // empty = default
+  const tooLong = renamePet(c, "가나다라마바사아자차카");
+  assert.match(tooLong.error, /10자/);
+  assert.equal(tooLong.character, c);
+  assert.match(renamePet(freshCharacter(), "감자").error, /먼저/);
+  assert.equal(c.name, "콩이"); // the old character was not changed
+});
+test("the name stays with the pet when another animal is bought or worn", () => {
+  let c = pickFirstAnimal(freshCharacter(), "cat", "감자").character;
+  c = buy(c, 500, "dog").character; // now the dog
+  assert.equal(c.animal, "dog");
+  assert.equal(petName(c), "감자");
+  assert.equal(petName(wearOrTakeOff(c, "cat")), "감자");
+});
+test("sanitizeCharacter keeps a good name, repairs a broken one and survives a JSON round trip", () => {
+  const c = pickFirstAnimal(freshCharacter(), "cat", "감자").character;
+  assert.deepEqual(sanitizeCharacter(JSON.parse(JSON.stringify(c))), c);
+  assert.equal(sanitizeCharacter({ ...c, name: 42 }).name, "");
+  assert.equal(sanitizeCharacter({ ...c, name: "가나다라마바사아자차카타" }).name, "가나다라마바사아자차");
+  assert.equal(sanitizeCharacter({ ownedAnimals: ["cat"], animal: "cat" }).name, ""); // an older save has no name
+  assert.equal(petName(sanitizeCharacter({ ownedAnimals: ["cat"], animal: "cat" })), "고양이");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

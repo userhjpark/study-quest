@@ -90,6 +90,12 @@ export function bindCharacterEvents(h) {
   $("char-buy-btn").addEventListener("click", h.onBuy);
   $("char-revert-btn").addEventListener("click", h.onRevert);
   $("char-start-btn").addEventListener("click", h.onStart);
+  $("pet-name-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    h.onRename($("pet-name-input").value);
+  });
+  $("pet-name-input").addEventListener("input", () => setNameError("rename", ""));
+  $("pet-name-first").addEventListener("input", () => setNameError("first", ""));
   $("header-avatar").addEventListener("click", h.onOpen);
 }
 
@@ -101,6 +107,21 @@ export function renderFocusAvatar(character) {
 
 export function renderHeaderAvatar(character) {
   $("header-avatar").replaceChildren(createAvatar(character));
+}
+
+// The name typed on the first-pick screen ("" = none).
+export function getFirstPetName() {
+  return $("pet-name-first").value;
+}
+
+export function clearFirstPetName() {
+  $("pet-name-first").value = "";
+  setNameError("first", "");
+}
+
+// which: "first" (first-pick screen) or "rename" (the form for the chosen pet)
+export function setNameError(which, message) {
+  $(which === "first" ? "pet-name-first-error" : "pet-name-error").textContent = message || "";
 }
 
 export function setShopCoins(coins) {
@@ -152,7 +173,14 @@ export function renderCharacterTab({ character, coins, category, previewId, mess
   $("char-preview").replaceChildren(createAvatar(shown));
   $("char-caption").textContent = firstPick && !previewEntry
     ? "아래에서 친구를 눌러 모습을 확인해 보세요. 첫 친구는 무료예요!"
-    : previewEntry ? `${previewEntry.name}${firstPick ? "" : " (입어보는 중)"}` : describeCharacter(character);
+    : previewEntry
+      ? `${previewEntry.name}${firstPick ? "" : " (입어보는 중)"}`
+      : character.name ? `${character.name} · ${describeCharacter(character)}` : describeCharacter(character);
+
+  // Rename form for the chosen pet (the box keeps what is being typed while it has focus).
+  $("pet-name-form").hidden = firstPick;
+  const nameInput = $("pet-name-input");
+  if (!firstPick && document.activeElement !== nameInput) nameInput.value = character.name;
   const msg = $("char-message");
   msg.textContent = message || "";
   msg.classList.toggle("is-good", Boolean(message) && good === true);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Study Quest</title>
+  <title>Study with Pet</title>
   <script>
     // Apply a saved light/dark choice before the first paint (no flash). Without a choice the CSS follows the system.
     try { var t = JSON.parse(localStorage.getItem("studyquest:theme")); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -17,7 +17,10 @@
 <body>
   <header class="app-header">
     <div class="title-row">
-      <h1>Study Quest</h1>
+      <div class="brand">
+        <h1>Study with Pet</h1>
+        <p class="tagline">펫이랑 같이 공부해요</p>
+      </div>
       <button id="theme-btn" class="theme-btn" type="button" aria-label="어두운 화면으로 바꾸기">🌙</button>
     </div>
     <div class="profile" aria-label="내 정보">
@@ -50,6 +53,7 @@
       <div class="card">
         <div id="focus-idle">
           <div class="focus-avatar"></div>
+          <p id="focus-idle-line" class="pet-line"></p>
           <section id="today-card" class="today-card" aria-labelledby="today-title">
             <h2 id="today-title">오늘의 공부</h2>
             <div class="stats today-stats">
@@ -98,6 +102,7 @@
             </div>
             <div class="focus-avatar"></div>
           </div>
+          <p id="focus-pet-line" class="pet-line"></p>
           <p id="focus-note" class="hint">다른 탭으로 옮겨도 타이머는 계속 돌아가요.</p>
           <button id="focus-cancel-btn" class="btn btn-secondary" type="button">그만하기 (보너스 없음)</button>
           <div id="focus-paused-actions" hidden>
@@ -109,6 +114,7 @@
         <div id="focus-done" hidden>
           <div class="focus-avatar"></div>
           <h2>집중 완료!</h2>
+          <p id="focus-done-line" class="pet-line"></p>
           <p id="focus-reward" class="result-reward" role="status"></p>
           <p id="focus-checkin" class="result-reward" role="status"></p>
           <label for="done-subject-select">퀴즈 과목</label>
@@ -218,6 +224,7 @@
 
         <div id="quiz-result" hidden>
           <h2>라운드 완료!</h2>
+          <p id="result-pet" class="pet-line"></p>
           <p id="result-correct" class="result-big"></p>
           <p id="result-reward" class="result-reward" role="status"></p>
           <p id="result-checkin" class="result-reward" role="status"></p>
@@ -240,7 +247,19 @@
         <div id="char-preview" class="char-preview"></div>
         <p id="char-caption" class="char-caption"></p>
         <p id="char-message" class="char-message" role="status"></p>
+        <form id="pet-name-form" class="pet-name-form" autocomplete="off" novalidate hidden>
+          <label for="pet-name-input">이름</label>
+          <div class="custom-row">
+            <input id="pet-name-input" type="text" maxlength="10" placeholder="예: 감자, 콩이">
+            <button class="btn btn-secondary" type="submit">저장</button>
+          </div>
+          <p class="hint">최대 10자예요. 비워서 저장하면 동물 이름으로 돌아가요.</p>
+          <p id="pet-name-error" class="error" role="alert"></p>
+        </form>
         <div id="char-first-actions" hidden>
+          <label for="pet-name-first">이름을 지어주세요 <span class="hint-inline">(선택, 최대 10자)</span></label>
+          <input id="pet-name-first" type="text" maxlength="10" placeholder="예: 감자, 콩이">
+          <p id="pet-name-first-error" class="error" role="alert"></p>
           <button id="char-start-btn" class="btn btn-primary" type="button">이 친구로 시작하기 (무료)</button>
         </div>
         <div id="char-try-actions" class="dialog-actions" hidden>

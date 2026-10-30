@@ -17,12 +17,13 @@ import {
   startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer, parseMinutes,
 } from "./timer.js";
 import { readPdfText, PdfError } from "./pdf-reader.js";
+import { focusIdleLine, focusRunningLine, focusDoneLine, quizResultLine } from "./pet-name.js";
 import { sanitizeTheme, effectiveTheme, otherTheme } from "./theme.js";
 import { appendText } from "./pdf-text.js";
 import { buildRoundRecord, addRecord, withPaidXp, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import {
-  sanitizeCharacter, hasAnimal, isOwned, pickFirstAnimal, buy, wearOrTakeOff, findAnimal, findItem,
+  sanitizeCharacter, hasAnimal, isOwned, pickFirstAnimal, petName, renamePet, buy, wearOrTakeOff, findAnimal, findItem,
 } from "./character.js";
 import * as ui from "./ui.js";
 import * as charUi from "./ui-character.js";
@@ -441,17 +442,31 @@ function handleCharRevert() {
 function handleCharStart() {
   const id = state.shop.previewId;
   if (!id) return;
-  const result = pickFirstAnimal(state.character, id);
+  const result = pickFirstAnimal(state.character, id, charUi.getFirstPetName());
   if (result.error) {
-    setShopMessage(result.error, false);
+    charUi.setNameError("first", result.error); // e.g. a name longer than 10 characters
     refreshCharacter();
     return;
   }
   state.character = result.character;
   state.shop.previewId = null;
   saveCharacter();
-  const name = findAnimal(id).name;
-  setShopMessage(`${name}, 잘 부탁해요!`, true);
+  charUi.clearFirstPetName();
+  setShopMessage(`${petName(state.character)}, 잘 부탁해요!`, true);
+  refreshCharacter();
+}
+
+// Renaming the pet later (an empty name goes back to the animal's own name).
+function handleCharRename(text) {
+  const result = renamePet(state.character, text);
+  if (result.error) {
+    charUi.setNameError("rename", result.error);
+    return;
+  }
+  charUi.setNameError("rename", "");
+  state.character = result.character;
+  saveCharacter();
+  setShopMessage(result.character.name ? "이름을 바꿨어요!" : "동물 이름으로 돌아갔어요.", true);
   refreshCharacter();
 }
 
@@ -490,6 +505,12 @@ function refreshFocus() {
     const left = focusMinutesLeftToday(state.profile, Date.now());
     ui.setFocusBonusInfo(`오늘 보너스를 받을 수 있는 시간: ${left}분 남음 (하루 ${DAILY_FOCUS_MINUTE_CAP}분까지)`);
   }
+  const pet = petName(state.character);
+  ui.setFocusPetLines({
+    idle: focusIdleLine(pet),
+    running: focus.phase === "running" ? focusRunningLine(pet, focus.timer.minutes) : "",
+    done: focusDoneLine(pet),
+  });
   if (focus.phase === "running") showTimerNow();
   if (focus.phase === "done") ui.showTimerDone({ reward: focus.reward });
   ui.setFocusAlert(focus.phase === "done" && state.tab !== "focus");
@@ -770,7 +791,11 @@ function showResults() {
 
   run.active = false;
   ui.setQuizSubjectEnabled(true);
-  ui.showResult(record, rewardMessage(reward.gained, reward.checkIn, levelUpText(before, state.profile)));
+  ui.showResult(
+    record,
+    rewardMessage(reward.gained, reward.checkIn, levelUpText(before, state.profile)),
+    quizResultLine(petName(state.character), record.correct),
+  );
 }
 
 function handleNext() {
@@ -819,6 +844,7 @@ charUi.bindCharacterEvents({
   onBuy: handleCharBuy,
   onRevert: handleCharRevert,
   onStart: handleCharStart,
+  onRename: handleCharRename,
   onOpen: () => handleTab("character"),
 });
 ui.setSubjectInput(loadText("lastSubject", ""));
