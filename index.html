@@ -38,6 +38,16 @@
     <section id="tab-focus" class="panel">
       <div class="card">
         <div id="focus-idle">
+          <section id="today-card" class="today-card" aria-labelledby="today-title">
+            <h2 id="today-title">오늘의 공부</h2>
+            <div class="stats today-stats">
+              <div><span class="stat-label">집중</span><strong id="today-focus">0분</strong></div>
+              <div><span class="stat-label">퀴즈</span><strong id="today-rounds">0회</strong></div>
+              <div><span class="stat-label">정답률</span><strong id="today-accuracy">-</strong></div>
+              <div><span class="stat-label">연속</span><strong id="today-streak">0일</strong></div>
+            </div>
+            <p id="today-note" class="hint"></p>
+          </section>
           <h2>집중 타이머</h2>
           <p class="hint">시간을 정하고 공부에 집중해 보세요. 끝까지 마치면 1분마다 1 XP, 5분마다 1 코인을 받고, 바로 퀴즈를 풀 수 있어요.</p>
           <div id="focus-durations" class="chips" role="group" aria-label="집중 시간">
@@ -144,7 +154,7 @@
         <select id="quiz-subject"></select>
 
         <div class="stats">
-          <div><span class="stat-label">점수</span><strong id="stat-score">0</strong></div>
+          <div><span class="stat-label">XP</span><strong id="stat-score">0</strong></div>
           <div><span class="stat-label">콤보</span><strong id="stat-combo">0</strong></div>
           <div><span class="stat-label">정답</span><strong id="stat-correct">0/0</strong></div>
         </div>
@@ -170,8 +180,7 @@
 
         <div id="quiz-result" hidden>
           <h2>라운드 완료!</h2>
-          <p class="result-line"><strong id="result-score">0</strong>점</p>
-          <p id="result-correct" class="result-line"></p>
+          <p id="result-correct" class="result-big"></p>
           <p id="result-reward" class="result-reward" role="status"></p>
           <p id="result-checkin" class="result-reward" role="status"></p>
           <p id="result-retry" class="result-line" hidden></p>

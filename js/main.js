@@ -11,12 +11,12 @@ import {
 } from "./quiz.js";
 import {
   DAILY_XP_CAP, sanitizeProfile, levelForXp, levelProgress, currentStreak, canCheckIn, applyCheckIn,
-  applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday, focusMinutesLeftToday, DAILY_FOCUS_MINUTE_CAP,
+  applyRoundWithCheckIn, applyTimerWithCheckIn, xpEarnedToday, summarizeToday, focusMinutesLeftToday, DAILY_FOCUS_MINUTE_CAP,
 } from "./rewards.js";
 import {
   startTimer, remainingMs, isFinished, isPaused, pauseTimer, resumeTimer, progress, formatRemaining, sanitizeTimer, parseMinutes,
 } from "./timer.js";
-import { buildRoundRecord, addRecord, sanitizeHistory } from "./history.js";
+import { buildRoundRecord, addRecord, withPaidXp, sanitizeHistory } from "./history.js";
 import { detectSeparator, parseLines, buildPreview } from "./importer.js";
 import {
   sanitizeCharacter, hasAnimal, isOwned, pickFirstAnimal, buy, wearOrTakeOff, findAnimal, findItem,
@@ -387,6 +387,7 @@ function refreshFocus() {
   const { focus } = state;
   ui.showFocus(focus.phase);
   if (focus.phase === "idle") {
+    ui.renderToday(summarizeToday(state.profile, Date.now()));
     const left = focusMinutesLeftToday(state.profile, Date.now());
     ui.setFocusBonusInfo(`오늘 보너스를 받을 수 있는 시간: ${left}분 남음 (하루 ${DAILY_FOCUS_MINUTE_CAP}분까지)`);
   }
@@ -625,7 +626,7 @@ function handleAnswer(pickedIndex) {
     run.retryTotal += 1;
     if (correct) {
       run.retryCorrect += 1;
-      message = "정답! (다시 풀기는 점수가 없어요)";
+      message = "정답! (다시 풀기는 XP가 없어요)";
     }
   } else {
     run.combo = nextCombo(run.combo, correct);
@@ -634,7 +635,7 @@ function handleAnswer(pickedIndex) {
     run.total += 1;
     if (correct) {
       run.correct += 1;
-      message = `정답! +${points}점`;
+      message = `정답! +${points} XP`;
       if (run.combo >= 2) message += ` (콤보 x${run.combo})`;
     } else if (!run.missedIds.includes(current.concept.id)) {
       run.missedIds.push(current.concept.id);
@@ -657,15 +658,16 @@ function showResults() {
   const record = buildRoundRecord({
     run, concepts: state.concepts, subject: scopeLabel(), now: Date.now(),
   });
-  state.history = addRecord(state.history, record);
-  save("history", state.history);
-  ui.renderHistory(state.history);
-
   const before = state.profile;
   const reward = applyRoundWithCheckIn(before, record, record.finishedAt);
   state.profile = reward.profile;
   save("profile", state.profile);
   refreshProfile();
+
+  // the history keeps the XP really paid (after the daily cap), so it is saved after the reward
+  state.history = addRecord(state.history, withPaidXp(record, reward.gained.xp));
+  save("history", state.history);
+  ui.renderHistory(state.history);
 
   run.active = false;
   ui.setQuizSubjectEnabled(true);

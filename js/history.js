@@ -25,6 +25,18 @@ export function buildRoundRecord({ run, concepts, subject, now }) {
   };
 }
 
+// The XP really paid for the round (after the daily cap) is only known once rewards.js has run, so
+// it is added to the record afterwards. Returns a new record; the original is not changed.
+export function withPaidXp(record, xpPaid) {
+  return { ...record, xpPaid };
+}
+
+// The XP to show for a record: what was paid, or the round's XP for older records saved before
+// `xpPaid` existed.
+export function xpShown(record) {
+  return isCount(record.xpPaid) ? record.xpPaid : record.score;
+}
+
 // Adds a record to the front (newest first) and keeps only the newest HISTORY_LIMIT.
 export function addRecord(history, record) {
   return [record, ...history].slice(0, HISTORY_LIMIT);
@@ -51,8 +63,10 @@ export function sanitizeHistory(list) {
   if (!Array.isArray(list)) return [];
   return list
     .filter(isRecord)
-    .map((r) => ({
+    .map(({ xpPaid, ...r }) => ({
       ...r,
+      // optional: older records do not have it; a broken value is dropped (the round XP shows then)
+      ...(isCount(xpPaid) ? { xpPaid } : {}),
       subject: r.subject.slice(0, MAX_TEXT),
       missedTerms: r.missedTerms.filter((t) => typeof t === "string").map((t) => t.slice(0, MAX_TEXT)),
     }))

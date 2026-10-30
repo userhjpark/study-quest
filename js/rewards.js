@@ -13,8 +13,15 @@ export const CHECKIN_STREAK_COINS_MAX = 7; // +1 coin per streak day, up to this
 
 const MAX_STORED = 1_000_000_000; // keeps edited/broken saved numbers sane
 
+// Counters that restart every day. `focusMinutes` is the capped bonus counter; `focusTotal` counts
+// every finished timer minute (no cap) and is what the "오늘의 공부" card shows. `rounds`, `correct`
+// and `questions` come from the main part of each finished round.
+function freshDaily(date) {
+  return { date, xp: 0, focusMinutes: 0, focusTotal: 0, rounds: 0, correct: 0, questions: 0 };
+}
+
 export function freshProfile() {
-  return { xp: 0, coins: 0, daily: { date: "", xp: 0, focusMinutes: 0 }, checkIn: { last: "", streak: 0 } };
+  return { xp: 0, coins: 0, daily: freshDaily(""), checkIn: { last: "", streak: 0 } };
 }
 
 function count(value) {
@@ -33,6 +40,10 @@ export function sanitizeProfile(raw) {
       date: typeof d.date === "string" ? d.date : "",
       xp: count(d.xp),
       focusMinutes: count(d.focusMinutes),
+      focusTotal: count(d.focusTotal),
+      rounds: count(d.rounds),
+      correct: count(d.correct),
+      questions: count(d.questions),
     },
     checkIn: { last: typeof c.last === "string" ? c.last : "", streak: count(c.streak) },
   };
@@ -72,7 +83,21 @@ export function levelProgress(xp) {
 function forToday(profile, now) {
   const today = dateKey(now);
   if (profile.daily.date === today) return profile;
-  return { ...profile, daily: { date: today, xp: 0, focusMinutes: 0 } };
+  return { ...profile, daily: freshDaily(today) };
+}
+
+// Numbers for the "오늘의 공부" card. `accuracy` is a whole percent, or null when no question was
+// answered today (so the card never shows NaN).
+export function summarizeToday(profile, now) {
+  const { focusTotal, rounds, correct, questions } = forToday(profile, now).daily;
+  return {
+    focusMinutes: focusTotal,
+    rounds,
+    correct,
+    questions,
+    accuracy: questions > 0 ? Math.round((correct / questions) * 100) : null,
+    streak: currentStreak(profile, now),
+  };
 }
 
 // XP counted against today's cap so far (for the "오늘 N/600 XP" line).
@@ -116,7 +141,12 @@ export function rewardsForRound(record) {
 
 export function applyRound(profile, record, now) {
   const { xp, coins } = rewardsForRound(record);
-  return grant(profile, now, xp, coins);
+  const result = grant(profile, now, xp, coins);
+  const daily = result.profile.daily; // fresh object made by grant()
+  daily.rounds += 1;
+  daily.correct += record.correct;
+  daily.questions += record.total;
+  return result;
 }
 
 // Bonus minutes still available today (of DAILY_FOCUS_MINUTE_CAP), for the focus screen.
@@ -139,6 +169,7 @@ export function applyTimerBonus(profile, minutes, now) {
   const coins = Math.floor((used + counted) / FOCUS_MINUTES_PER_COIN) - Math.floor(used / FOCUS_MINUTES_PER_COIN);
   const result = grant(today, now, counted * XP_PER_FOCUS_MINUTE, coins);
   result.profile.daily.focusMinutes = used + counted; // fresh object made by grant()
+  result.profile.daily.focusTotal += requested; // every finished minute, even past the bonus cap
   return { ...result, granted: counted > 0, minutes: counted, minutesCapped: counted < requested };
 }
 

@@ -14,13 +14,13 @@ import {
 } from "../js/quiz.js";
 
 import {
-  buildRoundRecord, addRecord, sanitizeHistory, HISTORY_LIMIT, ALL_SUBJECTS_LABEL,
+  buildRoundRecord, addRecord, sanitizeHistory, withPaidXp, xpShown, HISTORY_LIMIT, ALL_SUBJECTS_LABEL,
 } from "../js/history.js";
 
 import {
   DAILY_XP_CAP, DAILY_FOCUS_MINUTE_CAP, XP_PER_FOCUS_MINUTE, FOCUS_MINUTES_PER_COIN, focusMinutesLeftToday,
   freshProfile, sanitizeProfile, dateKey, xpForLevel, levelForXp, levelProgress,
-  rewardsForRound, applyRound, applyTimerBonus, xpLeftToday,
+  rewardsForRound, summarizeToday, applyRound, applyTimerBonus, xpLeftToday,
   CHECKIN_XP, applyCheckIn, canCheckIn, currentStreak,
   xpEarnedToday, applyRoundWithCheckIn, applyTimerWithCheckIn,
 } from "../js/rewards.js";
@@ -751,9 +751,10 @@ test("sanitizeProfile repairs missing, negative and non-number data", () => {
   assert.deepEqual(sanitizeProfile(null), freshProfile());
   assert.deepEqual(sanitizeProfile("x"), freshProfile());
   const p = sanitizeProfile({ xp: -5, coins: "9", daily: { date: 5, xp: NaN, focusMinutes: 2.7 }, checkIn: 3 });
-  assert.deepEqual(p, { ...freshProfile(), daily: { date: "", xp: 0, focusMinutes: 2 } });
+  assert.deepEqual(p, { ...freshProfile(), daily: { ...freshProfile().daily, focusMinutes: 2 } });
   const saved = {
-    xp: 120, coins: 7, daily: { date: "2026-10-29", xp: 50, focusMinutes: 40 },
+    xp: 120, coins: 7,
+    daily: { date: "2026-10-29", xp: 50, focusMinutes: 40, focusTotal: 45, rounds: 3, correct: 20, questions: 25 },
     checkIn: { last: "2026-10-29", streak: 4 },
   };
   assert.deepEqual(sanitizeProfile(saved), saved);
@@ -1474,6 +1475,96 @@ test("tapping the animal in use does nothing; an owned other animal is switched 
   assert.equal(wearOrTakeOff(c, "dog").animal, "dog");
   assert.equal(wearOrTakeOff(c, "cat").animal, "cat");
   assert.equal(wearOrTakeOff(c, "hamster").animal, "dog"); // not owned: nothing changes
+});
+
+/* ---------- "오늘의 공부" card numbers ---------- */
+const cardRec = (correct, total) => ({ ...recOf(correct * 10), correct, total, retryCorrect: 0, retryTotal: 0 });
+
+test("summarizeToday: a fresh profile shows zeros and no accuracy (not NaN)", () => {
+  const s = summarizeToday(freshProfile(), at(30));
+  assert.deepEqual(s, { focusMinutes: 0, rounds: 0, correct: 0, questions: 0, accuracy: null, streak: 0 });
+});
+test("summarizeToday: rounds, correct and questions add up over several rounds", () => {
+  let p = freshProfile();
+  p = applyRound(p, cardRec(8, 10), at(30)).profile;
+  p = applyRound(p, cardRec(5, 10), at(30, 15)).profile;
+  const s = summarizeToday(p, at(30, 20));
+  assert.equal(s.rounds, 2);
+  assert.equal(s.correct, 13);
+  assert.equal(s.questions, 20);
+  assert.equal(s.accuracy, 65);
+});
+test("summarizeToday: counts more than 10 rounds (not limited by the history)", () => {
+  let p = freshProfile();
+  for (let i = 0; i < 12; i++) p = applyRound(p, cardRec(10, 10), at(30)).profile;
+  assert.equal(summarizeToday(p, at(30)).rounds, 12);
+});
+test("summarizeToday: focus minutes are not capped like the bonus is", () => {
+  let p = freshProfile();
+  p = applyTimerBonus(p, 120, at(30)).profile;
+  p = applyTimerBonus(p, 120, at(30, 14)).profile; // bonus cap (180) is hit here
+  const s = summarizeToday(p, at(30, 15));
+  assert.equal(s.focusMinutes, 240);
+  assert.equal(p.daily.focusMinutes, 180);
+  p = applyTimerBonus(p, 25, at(30, 16)).profile; // bonus used up, minutes still counted
+  assert.equal(summarizeToday(p, at(30, 17)).focusMinutes, 265);
+});
+test("summarizeToday: a new day starts again at zero, the streak stays", () => {
+  let p = applyRoundWithCheckIn(freshProfile(), cardRec(4, 5), at(30)).profile;
+  p = applyTimerBonus(p, 25, at(30)).profile;
+  const next = summarizeToday(p, at(31));
+  assert.equal(next.rounds, 0);
+  assert.equal(next.focusMinutes, 0);
+  assert.equal(next.accuracy, null);
+  assert.equal(next.streak, 1); // checked in yesterday, still counts today
+  assert.equal(summarizeToday(p, at(30)).rounds, 1);
+});
+test("summarizeToday: a round with the retry part counts only the main part", () => {
+  const rec = { ...cardRec(3, 5), retryCorrect: 1, retryTotal: 2 };
+  const s = summarizeToday(applyRound(freshProfile(), rec, at(30)).profile, at(30));
+  assert.equal(s.correct, 3);
+  assert.equal(s.questions, 5);
+});
+test("summarizeToday: does not change the profile it was given", () => {
+  const p = freshProfile();
+  const copy = JSON.stringify(p);
+  summarizeToday(p, at(30));
+  assert.equal(JSON.stringify(p), copy);
+});
+
+/* ---------- History shows the XP really paid ---------- */
+test("history: a capped round is saved with the XP actually paid, not the round's XP", () => {
+  const record = { ...recOf(0), score: 85, correct: 8, total: 10 };
+  let p = freshProfile();
+  p = { ...p, daily: { ...p.daily, date: dateKey(at(30)), xp: 590 } }; // 10 XP left today
+  const reward = applyRound(p, record, at(30));
+  assert.equal(reward.gained.xp, 10);
+  assert.equal(reward.gained.capped, true);
+  const saved = withPaidXp(record, reward.gained.xp);
+  assert.equal(saved.xpPaid, 10);
+  assert.equal(saved.score, 85); // the round's own XP stays in the record
+  assert.equal(xpShown(saved), 10);
+  assert.equal(record.xpPaid, undefined); // the original record is not changed
+});
+test("history: a round after the cap is used up shows +0 XP", () => {
+  const record = { ...recOf(0), score: 50 };
+  let p = freshProfile();
+  p = { ...p, daily: { ...p.daily, date: dateKey(at(30)), xp: 600 } };
+  assert.equal(xpShown(withPaidXp(record, applyRound(p, record, at(30)).gained.xp)), 0);
+});
+test("history: records without xpPaid (older saves) show their round XP; xpPaid survives sanitizing", () => {
+  const old = recOf(0);
+  assert.equal(xpShown({ ...old, score: 70 }), 70);
+  const kept = sanitizeHistory([withPaidXp(old, 12), old]);
+  assert.equal(kept.length, 2);
+  assert.equal(kept[0].xpPaid, 12);
+  assert.equal(kept[1].xpPaid, undefined);
+  // a broken xpPaid is dropped, the record stays and shows its round XP
+  for (const bad of [-3, "x", 2.5, null]) {
+    const fixed = sanitizeHistory([{ ...withPaidXp(old, bad), score: 40 }]);
+    assert.equal(fixed.length, 1);
+    assert.equal(xpShown(fixed[0]), 40);
+  }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

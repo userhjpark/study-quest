@@ -2,6 +2,8 @@
 // User text is always inserted with textContent (never innerHTML) so typed
 // concepts cannot inject HTML.
 
+import { xpShown } from "./history.js";
+
 const $ = (id) => document.getElementById(id);
 
 // The three subject drop-downs (quiz tab, 집중 start screen, 집중 finish screen).
@@ -375,13 +377,12 @@ export function showQuizStart(canStart) {
   $("start-btn").disabled = !canStart;
 }
 
-export function showResult({ score, correct, total, missedTerms, retryTotal, retryCorrect }, reward) {
+export function showResult({ correct, total, missedTerms, retryTotal, retryCorrect }, reward) {
   showQuizPart("result");
   const rewardEl = $("result-reward");
   rewardEl.textContent = reward.text;
   rewardEl.classList.toggle("is-capped", reward.capped);
   $("result-checkin").textContent = reward.checkInText;
-  $("result-score").textContent = String(score);
   $("result-correct").textContent = `${total}문제 중 ${correct}문제 정답`;
   const retry = $("result-retry");
   retry.hidden = retryTotal === 0;
@@ -458,7 +459,7 @@ export function renderHistory(records) {
     when.className = "stat-label";
     when.textContent = `${formatWhen(r.finishedAt)} · ${r.subject}`;
     const score = document.createElement("strong");
-    score.textContent = `${r.score}점`;
+    score.textContent = `+${xpShown(r)} XP`;
     head.append(when, score);
 
     const detail = document.createElement("p");
@@ -533,6 +534,17 @@ export function setFocusCustomError(message) {
 export function clearFocusCustom() {
   $("focus-custom-input").value = "";
   setFocusCustomError("");
+}
+
+// The "오늘의 공부" card. `s` is the object from summarizeToday (rewards.js).
+export function renderToday(s) {
+  $("today-focus").textContent = `${s.focusMinutes}분`;
+  $("today-rounds").textContent = `${s.rounds}회`;
+  $("today-accuracy").textContent = s.accuracy === null ? "-" : `${s.accuracy}%`;
+  $("today-streak").textContent = `${s.streak}일`;
+  $("today-note").textContent = s.focusMinutes === 0 && s.rounds === 0
+    ? "아직 오늘 공부 기록이 없어요. 타이머나 퀴즈로 시작해 보세요!"
+    : s.questions > 0 ? `오늘 ${s.questions}문제 중 ${s.correct}문제를 맞혔어요.` : "";
 }
 
 export function setFocusBonusInfo(text) {

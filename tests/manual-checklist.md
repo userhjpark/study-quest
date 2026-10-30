@@ -55,15 +55,15 @@ The UI is in Korean. The page opens on the 집중 tab; for the Stage 1 items bel
 - [ ] **Edge case:** delete concepts of one subject until only 3 remain, then choose that subject. A red message names the subject ("'…' 과목에는 3개예요") and the start button is disabled. The other subject (and 전체 과목) still work.
 - [ ] **Edge case:** with fewer than 4 concepts in total, the quiz is blocked for 전체 과목 too.
 - [ ] Pick a correct option: it turns green, points increase by 10, "다음 문제" appears.
-- [ ] 3 correct in a row: combo shows 3 and bonus points appear (10, 15, 20).
-- [ ] Pick a wrong option: it turns red, the right one turns green, combo resets to 0, no points.
+- [ ] 3 correct in a row: combo shows 3 and the feedback says "정답! +10 XP", then "정답! +15 XP (콤보 x2)", then "+20 XP (콤보 x3)". The top box says "XP" (not "점수").
+- [ ] Pick a wrong option: it turns red, the right one turns green, combo resets to 0, no XP.
 - [ ] Options cannot be clicked again after answering.
 - [ ] **Each concept once:** with 5 concepts in a subject, play a round answering everything correctly. The label counts "1 / 5" to "5 / 5" and all 5 different concepts appear exactly once (write them down to check). The last button says "결과 보기" and there is no retry part.
 - [ ] With 10 or more concepts in the chosen subject, a round has 10 questions, all different.
 - [ ] **Retry (다시 풀기):** answer 2 questions wrong on purpose. After the last main question the button says "틀린 문제 다시 풀기". The label then reads "다시 풀기 1 / 2" (shown in the highlight color), and the same 2 concepts come back in the order they were first asked. The last retry button says "결과 보기".
-- [ ] In the retry part a correct answer shows "정답! (다시 풀기는 점수가 없어요)": points and combo do not change. A wrong answer in the retry is not asked a third time.
-- [ ] The result screen shows points, "N문제 중 M문제 정답", a "다시 풀기: …" line (only if a retry happened), and the concepts missed in the main part (or "없어요. 완벽한 라운드예요!").
-- [ ] "다시 하기" starts a fresh round with points and combo back at 0.
+- [ ] In the retry part a correct answer shows "정답! (다시 풀기는 XP가 없어요)": XP and combo do not change. A wrong answer in the retry is not asked a third time.
+- [ ] The result screen shows "N문제 중 M문제 정답" as the big line (no "점" anywhere), the "+N XP, +N 코인" line below it, a "다시 풀기: …" line (only if a retry happened), and the concepts missed in the main part (or "없어요. 완벽한 라운드예요!").
+- [ ] "다시 하기" starts a fresh round with XP and combo back at 0.
 - [ ] After a wrong answer in the main part, that concept shows a red "N번 틀림" badge in the Notes list; the badge stays after a correct retry. Correct answers in later rounds lower the number until it disappears.
 - [ ] Missed concepts are picked more often for big subjects (hard to see by eye; the numbers come from `node tests/logic.test.js`).
 - [ ] **Leave dialog:** during a round, tap the 노트 tab. The in-page dialog "퀴즈에서 나갈까요?" appears (not the browser's own popup).
@@ -83,7 +83,7 @@ Use clean data for the first items (private window or "Clear site data").
 - [ ] **Automatic check-in:** with clean data (button NOT pressed), finish a quiz round. The result screen shows the reward line ("+N XP, +N 코인") and a second line "출석 체크 완료! 연속 1일 · +10 XP, +6 코인". The header button now says "출석 완료".
 - [ ] **No double bonus (button first):** after pressing the button, finish a round: no "출석 체크 완료" line on the result screen, and XP/coins grow only by the round's reward.
 - [ ] **No double bonus (round first):** after the automatic check-in, the button is already "출석 완료" and cannot be pressed again. A second round the same day shows no check-in line.
-- [ ] Result screen reward: XP equals the round's points; coins = correct answers (+5 if every answer was correct). A correct answer in the retry part (다시 풀기) changes nothing.
+- [ ] Result screen reward: XP equals the XP shown in the top box during the round; coins = correct answers (+5 if every answer was correct). A correct answer in the retry part (다시 풀기) changes nothing.
 - [ ] Quitting a round midway ("퀴즈 종료" > "나가기") gives no XP or coins and adds nothing to "최근 기록".
 - [ ] The "오늘 N/600 XP" line goes up after each round by the XP gained.
 - [ ] **Level up:** after passing 100 XP the result screen says "레벨 업! Lv 2" and the header shows Lv 2 with the bar restarted.
@@ -92,7 +92,7 @@ Use clean data for the first items (private window or "Clear site data").
       then **reload**. The header says "오늘 590/600 XP". The next round gives at most 10 XP and says the cap was reached ("일부만 받았어요"); the line then shows "오늘 600/600 XP · 한도 도달" (highlighted). A round after that gives 0 XP, still gives coins, and shows the red cap notice.
 - [ ] **Streak:** console: `localStorage.setItem("studyquest:profile", JSON.stringify({xp:0,coins:0,daily:{date:"",xp:0,timerBonuses:0},checkIn:{last:new Date(Date.now()-864e5).toLocaleDateString("sv"),streak:3}}))` and reload. The header shows "연속 3일" and the button is enabled; check-in (or a round) says "연속 4일".
 - [ ] Same with `last` set 2 days ago: the header shows "연속 0일" and check-in says "연속 1일".
-- [ ] **최근 기록** (bottom of the Quiz tab): a new item per finished round (newest first) with date/time, subject, score, "N문제 중 M문제 정답" and "틀린 개념: …" (omitted if none). Only the newest 10 are kept. It is still there after a reload.
+- [ ] **최근 기록** (bottom of the Quiz tab): a new item per finished round (newest first) with date/time, subject, "+N XP" (the XP really paid: on a day when the cap cut the XP it shows the smaller number, and "+0 XP" once the cap is used up), "N문제 중 M문제 정답" and "틀린 개념: …" (omitted if none). Only the newest 10 are kept. It is still there after a reload.
 - [ ] A concept deleted after the round still shows in the history's missed list.
 - [ ] **Known limitation (two tabs):** with the site open in two tabs, a finished round in one tab can overwrite progress saved by the other tab. Reload before testing after editing localStorage in the console.
 
@@ -180,6 +180,17 @@ Use a hard refresh (Ctrl+Shift+R). For a fresh start, clear the site data for th
 - [ ] Earning coins while on the tab (the 출석 체크 button) updates the coin count in the shop.
 - [ ] **Broken data:** in the console run `localStorage.setItem("studyquest:character", '{"animal":"cat","ownedAnimals":[],"equipped":{"hat":"crown"}}')` and reload: the page still loads (no animal, nothing worn), not an error.
 - [ ] **Phone:** the four tabs fit on one row, the cards are easy to tap, nothing scrolls sideways, the header avatar does not squeeze the XP bar.
+
+## "오늘의 공부" card (집중 tab)
+
+- [ ] **Fresh start:** the card shows 집중 0분, 퀴즈 0회, 정답률 -, 연속 0일 and "아직 오늘 공부 기록이 없어요..." (no "NaN").
+- [ ] Finish a 1-minute timer: the card shows 집중 1분 and 연속 1일.
+- [ ] Finish a quiz round, then open the 집중 tab: 퀴즈 1회, the accuracy matches the result screen (main part only, the retry is not counted), and the note says "오늘 N문제 중 M문제를 맞혔어요."
+- [ ] Quit a timer early: the minutes do not change.
+- [ ] **Edge case, no cap:** in the console set `daily.focusMinutes` high (or finish timers past 180 minutes): the 집중 line keeps counting while the bonus line says 0분 남음.
+- [ ] More than 10 rounds in one day: 퀴즈 keeps counting (not limited to the 10 in 최근 기록).
+- [ ] Next day (change the saved `daily.date` to yesterday and reload): the card restarts at zero, the streak stays if you checked in yesterday.
+- [ ] Phone: the four numbers show as 2×2 and nothing scrolls sideways.
 
 ## Phone
 

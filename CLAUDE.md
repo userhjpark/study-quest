@@ -60,6 +60,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - **Tab order and default tab (decision Oct 29):** tabs are **집중 · 노트 · 퀴즈** and the page opens on **집중**. *Why:* the study flow is focus and study, review the notes, then test yourself with a quiz. Also, after a reload during a timer the app used to open on 노트 and the running timer looked like it had disappeared; opening on 집중 shows it.
 - **"내 개념을 추가해보세요" hint (decision Oct 29):** while the user has no concepts of their own (only the built-in samples, ids `s1`-`s10`; computed by `hasOwnConcepts` in `concepts.js`, so it comes back if they delete their own again), the **퀴즈** start screen shows a small box with a "노트 열기" button. It was first on the 집중 tab as well, but the user removed it there (**Oct 29**): a timer screen does not need it. *Why it exists:* the app opens on 집중, so a new user might never see the Notes tab and would only practice with the samples.
 - Stage 3 shop prices: set so the first item is affordable after 2-3 rounds (see Stage 3 below for the final prices).
+- **Wording (decision Oct 30): no "점수/점" anywhere; the same number is shown as XP** (quiz top box "XP", "정답! +10 XP (콤보 x2)", result screen big line "N문제 중 M문제 정답" then "+N XP, +N 코인", history item "+N XP"). Internal names (`score`) are unchanged. The history item shows the XP really paid after the daily cap: the record gets an optional `xpPaid` (set in `showResults` after `rewards.js` ran; `xpShown` in `history.js` falls back to `score` for older records without it).
 - **"최근 기록" section** under the Quiz tab (built Oct 29): shows the last 10 rounds with date, subject, score, correct count, and the missed concepts, saved in localStorage. It must share one **round-result record** with the XP/coin logic: when a round ends, `main.js` builds `{ finishedAt, subject, score, correct, total, retryCorrect, retryTotal, missedTerms }` (`finishedAt` as a timestamp; missed concepts as text so deleted concepts still show). `rewards.js` computes XP/coins from this record, and the history list stores the same record (keep the newest 10). Build the record in a pure function so it can be tested.
 
 **Stage 3 (core, built Oct 30)**
@@ -72,25 +73,18 @@ All code must be written from scratch in this repo. No templates, no reused code
   - Saving: the character has its own key `studyquest:character`; coins stay in the profile. A purchase saves the character first and the coins second (worst case a free item, never a lost purchase). Broken saved data is repaired on load (`sanitizeCharacter`).
   - Files: `character.js` (rules, pure), `avatar-art.js` (shape data, pure), `ui-character.js` (SVG drawing and the shop screen). `tests/avatar-gallery.html` shows every animal with every item (not linked from the app).
 
-**After Stage 3 (planned Oct 29, not built; only if time allows, before the README):**
-- A small **"오늘의 공부" card at the top of the 집중 tab** showing today's focus minutes, quiz rounds, accuracy, and streak, built from data we already save (`profile.daily.focusMinutes`, the "최근 기록" history, `profile.checkIn`). Note: the history keeps only the newest 10 rounds, so "today's rounds/accuracy" counts the rounds of today within those 10. Keep the calculation in a pure function with tests.
-- If time allows after that: a **7-day focus-minutes bar chart**. This needs a small per-day record (date -> focus minutes, last 7 days) that is not saved yet, because only today's minutes are kept now.
+**After Stage 3 (planned Oct 29, card built Oct 30):**
+- **"오늘의 공부" card at the top of the 집중 tab (decision Oct 30, built Oct 30):** shows today's focus minutes, quiz rounds, accuracy, and streak. *Changed from the first plan:* the numbers do NOT come from the bonus counter (it stops at 180) or from the 10-round history. `profile.daily` has its own counters that reset when the date changes: `focusTotal` (all finished timer minutes, no cap), `rounds`, `correct`, `questions` (main part of each finished round, retry not counted). `summarizeToday` in `rewards.js` is a pure function with tests; `accuracy` is `null` (shown as "-") when no question was answered. Quitting a timer adds nothing.
+- **7-day focus chart: skipped by the user (Oct 30).** It would need a per-day record (date -> minutes, last 7 days). Future work.
 
-**Stage 4 (optional)**: decide on **Oct 30 evening** (moved to Oct 31 morning by the user) between two options (choose one). If Stages 1-3 are not done by then, drop it and list it as a future feature in the README.
+**Stage 4 = PDF import (decision Oct 30).** The user chose Option A. The leaderboard (Option B) is dropped and goes to future work. PDF import is time-boxed to about 2 hours of work; if it is not working well by then, stop and list it as future work with what we learned.
 
-*Option A: PDF import*
+*PDF import (Option A)*
 - Read text-based PDFs only (no scanned/OCR) with pdf.js, loaded from a CDN at a pinned version (do not commit the library; mention it as a third-party library in the README).
 - Size and page limits (e.g. a few MB, a few dozen pages; decide when building). Show a clear message for scanned or too-large files.
 - Extracted text goes through the same `importer.js` parsing and the same preview as bulk import.
 
-*Option B: Firebase leaderboard*
-- Firebase free-tier leaderboard: global ranking (show only players near me) + teams via team code and team rankings.
-- Anonymous Firebase sign-in, nickname only. No email, real name, or other personal info.
-- Firestore Security Rules so users can only write their own score doc and score jumps are bounded.
-
-## Firebase config decision
-
-`firebase-config.js` (Firebase *web* config) **is committed**. It is public by design; security comes from Security Rules plus restricting the API key by HTTP referrer to the GitHub Pages domain. The README must explain this. **Never commit** service-account JSON, Admin SDK keys, or any private key.
+*Dropped (Oct 30): Firebase leaderboard* (future work). It would have been: a Firebase free-tier global ranking showing only players near me, plus teams via team code; anonymous sign-in with a nickname only; Firestore Security Rules so users can only write their own score doc and score jumps are bounded. No Firebase is used now, so there is no `firebase-config.js`. **Never commit** service-account JSON, Admin SDK keys, or any private key.
 
 ## Testing
 
@@ -108,7 +102,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 
 ## Planned key files (max 5 for grading)
 
-`quiz.js` (quiz logic), `rewards.js` (XP / streak / coins logic), `character.js`, `leaderboard.js` (only if Stage 4 happens; otherwise swap in `storage.js` or `timer.js`), `ui.js`.
+`quiz.js` (quiz logic), `rewards.js` (XP / streak / coins logic), `character.js`, a fifth file chosen from `timer.js`, `importer.js` or the PDF file (the leaderboard is dropped), `ui.js`.
 
 ## Assignment requirements (summary)
 
@@ -118,13 +112,13 @@ All code must be written from scratch in this repo. No templates, no reused code
 
 **Repo:** new public repo, meaningful commit history, human-readable `README.md` of **at most 1,200 words** containing: purpose and intended user; how to run/use; short account of work process; selected Claude Code evidence and verification results; three effective practices and three difficulties; known limitations (include the items below); at most five key source files for grading. At most **six** agent excerpts or screenshots. The README must be accurate and in the user's own voice, not raw agent output.
 
-**Never commit:** credentials, API keys (beyond the public Firebase web config above), personal data, dependencies, build output, large raw data, video files.
+**Never commit:** credentials, API keys, personal data, dependencies, build output, large raw data, video files.
 
 **Grading (20):** purpose and scope 3; process and agent evidence 5; working project 4; verification 2; reflection on practices and difficulties 4; documentation and readability 2.
 
 ## Known limitations to list in README
 
-- localStorage-based XP cap, coins, and streaks can be bypassed by editing browser data or changing the device clock. Only Stage 4 server-side rules can limit this, and even they can only bound score jumps.
+- localStorage-based XP cap, coins, and streaks can be bypassed by editing browser data or changing the device clock. Only a server-side check (such as the dropped leaderboard idea) could limit this, and even that can only bound score jumps.
 - Data lives per browser/device; clearing site data erases progress.
 - Subjects cannot be renamed or deleted; a subject exists as long as it has concepts.
 - If the site is open in two tabs at once, one tab can overwrite progress saved by the other, because each tab keeps its own copy in memory (seen on Oct 29: a finished round overwrote a value changed in the console without a reload). Use one tab at a time.
@@ -136,8 +130,9 @@ All code must be written from scratch in this repo. No templates, no reused code
 ## Future work to list in the README
 
 - A daily study to-do list (not part of this project).
-- Stage 4 options that were not built (PDF import or the Firebase leaderboard), if one of them is dropped.
-- "오늘의 공부" card / 7-day focus chart, if not built.
+- The Firebase leaderboard (global ranking near me, teams via team code, anonymous sign-in with a nickname, Security Rules bounding score jumps): dropped on Oct 30 in favour of PDF import.
+- A 7-day focus-minutes bar chart (needs a per-day record that is not saved now): skipped on Oct 30.
+- PDF import, if it is not finished within its time box.
 - More animals (돼지, 호랑이, 원숭이): the art system makes a new animal one more entry in `avatar-art.js` plus `character.js`, but it was not built.
 
 ## Status
@@ -175,6 +170,9 @@ Live site: https://userhjpark.github.io/study-quest/ (Stage 3 pushed Oct 30; fil
 
 **Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `js/character.js`, `js/avatar-art.js`, `js/ui-character.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`, `tests/avatar-gallery.html`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
+**Oct 30:** Stage 4 decided: PDF import (leaderboard dropped, 7-day chart skipped). "오늘의 공부" card built (see above); waiting for the user's manual test before commit.
+
 **Next (in order):**
-1. **Oct 31 (the user decides first thing):** Stage 4 (A: PDF import, B: Firebase leaderboard, or skip and list it as future work). Stages 1-3 are done and pushed, so we are on track; skipping leaves more room for the items below.
-2. Optionally the "오늘의 공부" card (see above). Then README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
+1. User tests the "오늘의 공부" card, then commit.
+2. PDF import (about 2 hours, plan first, wait for approval).
+3. README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
