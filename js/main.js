@@ -232,6 +232,7 @@ async function handlePdfFile(file) {
     refreshBulk();
     done = { status: `${pages}쪽을 읽었어요. 아래 미리보기를 확인하고 추가하세요.` };
   } catch (err) {
+    if (!(err instanceof PdfError)) console.error("[PDF] unexpected error in the import handler:", err);
     done = { error: err instanceof PdfError ? err.message : "PDF를 읽지 못했어요." };
   }
   pdfBusy = false;
