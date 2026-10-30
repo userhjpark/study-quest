@@ -272,9 +272,10 @@ export function setBulkText(text) {
 }
 
 // PDF line under the button: `status` is a progress/result text, `error` a red message.
-export function setPdfState({ status = "", error = "", busy = false }) {
+export function setPdfState({ status = "", error = "", detail = "", busy = false }) {
   $("pdf-status").textContent = status;
   $("pdf-error").textContent = error;
+  $("pdf-detail").textContent = detail; // small grey technical text (failed step, error name, message)
   $("pdf-btn").disabled = busy;
 }
 

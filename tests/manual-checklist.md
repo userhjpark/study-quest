@@ -196,7 +196,9 @@ Use a hard refresh (Ctrl+Shift+R). For a fresh start, clear the site data for th
 
 Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a PDF is chosen). Test files: any text PDF with lines like "개념: 정의" (e.g. export a Google Doc or Word file to PDF), plus a photographed/scanned PDF.
 
-- [ ] **Normal PDF:** open "여러 개 한 번에 추가", press "PDF에서 불러오기", choose a text PDF. It shows "PDF를 읽는 중… (1/N쪽)", then "N쪽을 읽었어요…". The lines appear in the "붙여 넣기" box and the usual preview (ok / duplicate / invalid) appears. Korean text is not garbled.
+- [ ] **Findable:** the section title on the 노트 tab says "여러 개 한 번에 추가 (PDF 가능)"; inside it, the big "PDF에서 불러오기" button is at the top, with the 3-line guide (format with an example line, lecture slides warning, scans) under it.
+- [ ] **iPhone Safari:** load the same PDF as on desktop. If it fails, the small grey line under the red message shows the engine, step, error name and browser (send it to the developer). If it works through the fallback, the status says "(호환 모드로 읽었어요…)" and the text is not garbled.
+- [ ] **Normal PDF:** open "여러 개 한 번에 추가 (PDF 가능)", press "PDF에서 불러오기", choose a text PDF. It shows "PDF를 읽는 중… (1/N쪽)", then "N쪽을 읽었어요…". The lines appear in the "붙여 넣기" box and the usual preview (ok / duplicate / invalid) appears. Korean text is not garbled.
 - [ ] Lines in the form "개념: 정의" are "ok"; headings and page numbers are red "구분 기호가 없어요" (skipped). "추가하기" saves only the ok ones into the chosen subject.
 - [ ] **Wrapped lines:** a definition that wraps onto a second (or third) line in the PDF is joined into ONE concept line (no red "구분 기호가 없어요" for the continuation), with no stray space inside a Korean word. Titles and a really broken line after a short line stay separate (red).
 - [ ] **Append:** type a line in the box first, then load a PDF: the old line stays, a blank line follows, then the PDF text. Loading a second PDF appends again.

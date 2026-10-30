@@ -225,15 +225,17 @@ async function handlePdfFile(file) {
   ui.setPdfState({ status: "PDF를 읽는 중…", busy: true });
   let done = { status: "" };
   try {
-    const { text, pages } = await readPdfText(file, (page, total) => {
+    const { text, pages, usedFallback } = await readPdfText(file, (page, total) => {
       ui.setPdfState({ status: `PDF를 읽는 중… (${page}/${total}쪽)`, busy: true });
     });
     ui.setBulkText(appendText(ui.getBulkInput().text, text));
     refreshBulk();
-    done = { status: `${pages}쪽을 읽었어요. 아래 미리보기를 확인하고 추가하세요.` };
+    done = { status: `${pages}쪽을 읽었어요. 아래 미리보기를 확인하고 추가하세요.${usedFallback ? " (호환 모드로 읽었어요. 글자가 깨졌으면 알려 주세요.)" : ""}` };
   } catch (err) {
     if (!(err instanceof PdfError)) console.error("[PDF] unexpected error in the import handler:", err);
-    done = { error: err instanceof PdfError ? err.message : "PDF를 읽지 못했어요." };
+    done = err instanceof PdfError
+      ? { error: err.message, detail: err.detail }
+      : { error: "PDF를 읽지 못했어요.", detail: `예상 못 한 오류 · ${err && err.name}: ${String(err && err.message).slice(0, 160)}` };
   }
   pdfBusy = false;
   ui.setPdfState(done);

@@ -113,20 +113,23 @@
       <datalist id="subject-list"></datalist>
 
       <details id="bulk" class="card">
-        <summary>여러 개 한 번에 추가</summary>
+        <summary>여러 개 한 번에 추가 (PDF 가능)</summary>
         <div class="bulk-body">
-          <p class="hint">한 줄에 개념 하나씩 붙여 넣으세요. 엑셀이나 구글 시트에서 복사해도 돼요.</p>
-
+          <div class="pdf-box">
+            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden>
+            <button id="pdf-btn" class="btn btn-primary" type="button">PDF에서 불러오기</button>
+            <p id="pdf-status" class="hint" role="status"></p>
+            <p id="pdf-error" class="error" role="alert"></p>
+            <p id="pdf-detail" class="pdf-detail"></p>
+            <ul class="pdf-guide">
+              <li>"개념: 정의" 형식으로 한 줄씩 정리된 PDF가 가장 잘 돼요 (요약 노트, 단어장, 기출 정리).<br><span class="pdf-example">예) 광합성: 식물이 빛으로 양분을 만드는 과정</span></li>
+              <li>강의자료를 그대로 올리면 개념을 골라내지 못해요. 먼저 "개념: 정의" 형식으로 정리한 뒤 PDF로 저장해 올리는 걸 추천해요.</li>
+              <li>스캔본(사진)은 읽을 수 없어요. (10MB, 50쪽까지)</li>
+            </ul>
+          </div>
+          <p class="hint">또는 한 줄에 개념 하나씩 직접 붙여 넣으세요. 엑셀이나 구글 시트에서 복사해도 돼요.</p>
           <label for="bulk-subject">과목 <span class="hint-inline">(붙여 넣은 개념이 모두 이 과목에 들어가요)</span></label>
           <input id="bulk-subject" type="text" maxlength="30" list="subject-list" placeholder="예: 한국사 (비워 두면 미분류)" autocomplete="off">
-
-          <div class="pdf-row">
-            <input id="pdf-input" type="file" accept="application/pdf,.pdf" hidden>
-            <button id="pdf-btn" class="btn btn-secondary" type="button">PDF에서 불러오기</button>
-            <span class="hint-inline">글자가 있는 PDF만 (10MB, 50쪽까지)</span>
-          </div>
-          <p id="pdf-status" class="hint" role="status"></p>
-          <p id="pdf-error" class="error" role="alert"></p>
 
           <label for="bulk-text">붙여 넣기</label>
           <textarea id="bulk-text" rows="6" placeholder="광합성: 식물이 빛으로 양분을 만드는 과정&#10;리보솜: 단백질을 합성하는 세포 소기관"></textarea>

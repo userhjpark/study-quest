@@ -17,6 +17,8 @@ export const PDF_MESSAGES = {
   password: "비밀번호가 걸린 PDF는 읽을 수 없어요.",
   broken: "PDF를 읽지 못했어요. 파일이 깨졌을 수 있어요.",
   library: "PDF 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.",
+  engine: "이 브라우저에서는 PDF 읽기가 안 될 수 있어요 (특히 아이폰 Safari). 컴퓨터에서 해 보거나, 내용을 직접 붙여 넣어 주세요.",
+  offline: "PDF 읽기 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요. (아이폰 Safari에서는 PDF 읽기가 안 될 수도 있어요.)",
 };
 
 // Checks the chosen file before reading it. Returns an error text, or null when it is fine.
