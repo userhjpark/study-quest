@@ -129,6 +129,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - XP and coins are given when a round finishes; quitting midway gives nothing.
 - Coins are not limited by the daily cap (only XP is).
 - Purchases are not undoable and items cannot be sold; only the coin check protects the shop, and coins live in editable localStorage like everything else.
+- **PDF import works best for summary notes and word lists in "개념: 정의" form, not for unstructured lecture slides.** Real test (Oct 30, a 10-page 디지털창업 lecture PDF): 17 concepts added, 2 duplicates, 378 error lines; only about 12 of the 17 were usable concepts. Causes seen: (1) lines that are not concepts but contain a ":" ("Source: Airbnb Newsroom…", slide headings like "핵심: …" and "학생 창업 질문: …"); (2) text of the next item glued on ("(AFFORDABLE LOSS)" ends with "– 브리콜라주"); (3) missing spaces where one sentence ends and the next starts on a new line ("시작된다변화", "눈’같은"), because the no-space rule for Hangul joins also applies across sentence ends. Picking concepts out of free text would need AI, which this project avoids to stay free. That is why the preview step matters: the user checks and edits before adding, and can delete bad concepts later. Also: scanned PDFs are not supported (no OCR), pdf.js needs internet the first time (CDN), two-column pages and tables can come out in odd order, and a definition that continues on the next page is not joined.
 - (Add more as they are discovered.)
 
 ## Future work to list in the README
@@ -136,7 +137,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - A daily study to-do list (not part of this project).
 - The Firebase leaderboard (global ranking near me, teams via team code, anonymous sign-in with a nickname, Security Rules bounding score jumps): dropped on Oct 30 in favour of PDF import.
 - A 7-day focus-minutes bar chart (needs a per-day record that is not saved now): skipped on Oct 30.
-- PDF import, if it is not finished within its time box.
+- PDF import improvements (not built): keep sentence ends from being glued without a space, skip obvious non-concept lines (headings, "Source:"), stop glue-on of the next item, join definitions across pages, OCR for scans. Choosing concepts from free-text slides would need AI and is out of scope.
 - More animals (돼지, 호랑이, 원숭이): the art system makes a new animal one more entry in `avatar-art.js` plus `character.js`, but it was not built.
 
 ## Status
@@ -172,11 +173,14 @@ Live site: https://userhjpark.github.io/study-quest/ (Stage 3 pushed Oct 30; fil
 - Header avatar, a dot on the 캐릭터 tab until the first friend is picked, first-pick screen, shop with category chips, try-on, buying, equipping.
 - Tests: 191 Node tests pass; manual checklist has a "Stage 3: Character" section.
 
-**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `js/character.js`, `js/avatar-art.js`, `js/ui-character.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`, `tests/avatar-gallery.html`. No README yet (due before submission; max 1,200 words, English, user's own voice).
+**Files now:** `index.html`, `css/style.css`, `js/main.js`, `js/ui.js`, `js/storage.js`, `js/concepts.js`, `js/quiz.js`, `js/importer.js`, `js/history.js`, `js/rewards.js`, `js/timer.js`, `js/character.js`, `js/avatar-art.js`, `js/ui-character.js`, `js/pdf-text.js`, `js/pdf-reader.js`, `package.json`, `tests/logic.test.js`, `tests/manual-checklist.md`, `tests/avatar-gallery.html`. No README yet (due before submission; max 1,200 words, English, user's own voice).
 
-**Oct 30:** Stage 4 decided: PDF import (leaderboard dropped, 7-day chart skipped). "오늘의 공부" card built (see above); waiting for the user's manual test before commit.
+**Oct 30:** Stage 4 decided: PDF import (leaderboard dropped, 7-day chart skipped).
+- "오늘의 공부" card on the 집중 tab (own daily counters in the profile), passed the user's test. Quiz wording changed from "점수" to XP everywhere; 최근 기록 shows the XP really paid after the daily cap (`xpPaid`). Committed (`da3804e`).
+- **Stage 4 (PDF import) is complete (Oct 30).** Built in about 1.5 hours of the 2-hour time box: `pdf-text.js` (limits 10 MB / 50 pages, line rebuilding, wrapped-line joining, scan detection; pure, tested), `pdf-reader.js` (pdf.js 6.4.299 legacy build from jsDelivr, loaded only when a file is chosen), button in the bulk import. Text is appended to the paste box and goes through the usual preview. Bug found by the user: `doc.destroy()` does not exist in pdf.js 6 and the generic message hid it; fixed, and every failure now logs its step. The user's retests passed (ko.pdf, blank/not-a-PDF, own 컴활 PDF with 20 concepts, wrapped lines). A real lecture PDF showed the limits listed under "Known limitations".
+- Tests: 220 Node tests pass; manual checklist has "오늘의 공부" and PDF sections. Pushed to main and the live site checked (see below).
 
-**Next (in order):**
-1. User tests the "오늘의 공부" card, then commit.
-2. PDF import (about 2 hours, plan first, wait for approval).
-3. README, then the video (5-10 min, not in the repo). Deadline Nov 1, 23:59 KST.
+**Next (in order), Oct 31:**
+1. Final verification pass: `node tests/logic.test.js`, the manual checklist on the live site (phone too), and one edge case shown on purpose for the video (e.g. fewer than 4 concepts blocks the quiz, or the scanned PDF message).
+2. README (English, max 1,200 words, the user's own voice): purpose and user, how to run (`python3 -m http.server`), work process, Claude Code evidence (max 6 excerpts/screenshots), verification results, three effective practices, three difficulties, known limitations, future work, third-party library (pdf.js from CDN), and the 5 key files (decide the 5th on Saturday: `timer.js`, `importer.js` or `pdf-text.js`).
+3. Video (5-10 min, MP4, not in the repo), then submit on the LMS: video, repo URL, live URL. Deadline Nov 1, 23:59 KST.
