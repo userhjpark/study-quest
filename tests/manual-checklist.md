@@ -198,6 +198,7 @@ Needs internet (pdf.js 6.4.299 is loaded from the jsDelivr CDN the first time a 
 
 - [ ] **Normal PDF:** open "여러 개 한 번에 추가", press "PDF에서 불러오기", choose a text PDF. It shows "PDF를 읽는 중… (1/N쪽)", then "N쪽을 읽었어요…". The lines appear in the "붙여 넣기" box and the usual preview (ok / duplicate / invalid) appears. Korean text is not garbled.
 - [ ] Lines in the form "개념: 정의" are "ok"; headings and page numbers are red "구분 기호가 없어요" (skipped). "추가하기" saves only the ok ones into the chosen subject.
+- [ ] **Wrapped lines:** a definition that wraps onto a second (or third) line in the PDF is joined into ONE concept line (no red "구분 기호가 없어요" for the continuation), with no stray space inside a Korean word. Titles and a really broken line after a short line stay separate (red).
 - [ ] **Append:** type a line in the box first, then load a PDF: the old line stays, a blank line follows, then the PDF text. Loading a second PDF appends again.
 - [ ] Choosing the same file twice in a row works both times.
 - [ ] **Edge case, scanned/picture PDF:** the red message "글자를 읽을 수 없는 PDF예요…" appears and the box does not change.

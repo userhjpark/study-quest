@@ -43,34 +43,44 @@ export function looksScanned(text, pages) {
 // columns). A new line starts when the vertical position changes by more than half a letter
 // height, or when pdf.js marks an end of line. A space is added between two pieces on one line
 // when there is a visible gap and neither side already has one.
-export function rebuildLines(items) {
+// Returns one object per line with its position, which joinWrappedLines needs:
+//   { text, x0, x1, y, height, spaceBefore, spaceAfter }
+// (x0/x1 = left/right end, spaceBefore/After = the raw line started/ended with a space).
+export function rebuildLineInfos(items) {
   const lines = [];
-  let line = "";
-  let lineY = null;
-  let prevEnd = null;
+  let cur = null;
   const flush = () => {
-    const text = line.replace(/\s+/g, " ").trim();
-    if (text) lines.push(text);
-    line = "";
-    lineY = null;
-    prevEnd = null;
+    if (cur) {
+      const text = cur.raw.replace(/\s+/g, " ").trim();
+      if (text) {
+        lines.push({
+          text, x0: cur.x0, x1: cur.x1, y: cur.y, height: cur.height,
+          spaceBefore: /^\s/.test(cur.raw), spaceAfter: /\s$/.test(cur.raw),
+        });
+      }
+    }
+    cur = null;
   };
 
   for (const item of items) {
     if (item === null || typeof item !== "object" || typeof item.str !== "string") continue;
     const [x, y] = Array.isArray(item.transform) ? [item.transform[4], item.transform[5]] : [0, 0];
     const height = Number.isFinite(item.height) && item.height > 0 ? item.height : 10;
-    if (lineY !== null && Math.abs(y - lineY) > height * 0.5) flush();
+    if (cur && Math.abs(y - cur.y) > height * 0.5) flush();
 
-    if (line !== "" && item.str !== "") {
-      const gap = prevEnd === null ? 0 : x - prevEnd;
-      const spaced = /\s$/.test(line) || /^\s/.test(item.str);
-      if (!spaced && gap > height * 0.15) line += " ";
-    }
-    line += item.str;
     if (item.str !== "") {
-      if (lineY === null) lineY = y;
-      prevEnd = x + (Number.isFinite(item.width) ? item.width : 0);
+      if (!cur) cur = { raw: "", x0: x, x1: x, y, height, prevEnd: null };
+      if (cur.raw !== "") {
+        const gap = cur.prevEnd === null ? 0 : x - cur.prevEnd;
+        const spaced = /\s$/.test(cur.raw) || /^\s/.test(item.str);
+        if (!spaced && gap > height * 0.15) cur.raw += " ";
+      }
+      cur.raw += item.str;
+      const end = x + (Number.isFinite(item.width) ? item.width : 0);
+      cur.prevEnd = end;
+      cur.x0 = Math.min(cur.x0, x);
+      cur.x1 = Math.max(cur.x1, end);
+      if (Number.isFinite(item.height) && item.height > 0) cur.height = Math.max(cur.height, item.height);
     }
     if (item.hasEOL) flush();
   }
@@ -78,7 +88,73 @@ export function rebuildLines(items) {
   return lines;
 }
 
-// Text of the whole file: `pages` is a list with one list of pdf.js pieces per page.
+/* ---------- Wrapped lines ---------- */
+
+// A line with this (":" or the full-width "：") is a "concept: definition" line. The PDF import
+// fills the paste box, where ":" is the default separator.
+const HAS_SEPARATOR = /[:：]/;
+const HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]/;
+const LATIN = /[A-Za-z0-9]/;
+
+// Slack (in points) from the right edge within which a line still counts as "full width".
+function wrapSlack(left, right, height) {
+  return Math.max(height * 5, (right - left) * 0.12);
+}
+
+// Where the text area ends on this page: the right end of the long lines. The top 10% of right
+// ends are skipped so one right-aligned date or page number does not stretch the text area.
+function rightEdge(lines) {
+  const ends = lines.map((l) => l.x1).sort((a, b) => b - a);
+  return ends[Math.floor(ends.length * 0.1)];
+}
+
+// Joins two halves of a wrapped line. Korean is often broken inside a word ("시" / "스템"), so
+// between two Hangul letters nothing is added. A space is added when the line break had one, or
+// when a Latin word/number meets another letter ("name" / "system", "서버" / "DNS").
+function joinParts(prev, next) {
+  if (prev.spaceAfter || next.spaceBefore) return `${prev.text} ${next.text}`;
+  const a = prev.text.slice(-1);
+  const b = next.text.charAt(0);
+  const bothHangul = HANGUL.test(a) && HANGUL.test(b);
+  const eitherLatin = LATIN.test(a) || LATIN.test(b);
+  return bothHangul || !eitherLatin ? prev.text + next.text : `${prev.text} ${next.text}`;
+}
+
+// PDF lines that are only the wrapped rest of the line above are joined to it. A line is joined
+// when ALL of these are true (otherwise it stays separate, so a really broken line still shows up
+// red in the preview):
+//   - it has no separator itself;
+//   - the line above has a separator (it is a concept line) and reached close to the right edge
+//     of the text area, so it was wrapped and not just short;
+//   - it follows closely (the vertical gap is at most 2 letter heights, no paragraph break).
+// A joined line counts as the new line above, so a definition that wraps twice works too.
+export function joinWrappedLines(lines) {
+  if (lines.length < 2) return lines.map((l) => l.text);
+  const left = Math.min(...lines.map((l) => l.x0));
+  const right = rightEdge(lines);
+  const out = [];
+  let prev = null; // the line above, with the position of its LAST physical line
+  for (const line of lines) {
+    const close = prev && prev.y - line.y > 0 && prev.y - line.y <= prev.height * 2;
+    const wrapped = prev && prev.x1 >= right - wrapSlack(left, right, prev.height);
+    if (prev && close && wrapped && HAS_SEPARATOR.test(prev.text) && !HAS_SEPARATOR.test(line.text)) {
+      prev = { ...line, text: joinParts(prev, line), spaceBefore: prev.spaceBefore };
+      out[out.length - 1] = prev.text;
+    } else {
+      prev = line;
+      out.push(line.text);
+    }
+  }
+  return out;
+}
+
+// Text lines of one page, with wrapped lines joined.
+export function rebuildLines(items) {
+  return joinWrappedLines(rebuildLineInfos(items));
+}
+
+// Text of the whole file: `pages` is a list with one list of pdf.js pieces per page. Lines are
+// only joined within a page.
 export function pagesToText(pages) {
   return pages.flatMap((items) => rebuildLines(items)).join("\n");
 }

@@ -1624,11 +1624,94 @@ test("pdf: appendText puts the PDF text below the old text with one blank line",
   assert.equal(appendText("X: 0\n\n\n", "A: 1"), "X: 0\n\nA: 1");
 });
 test("pdf: the text goes through the same parser and preview as pasted text", () => {
-  const text = pagesToText([[piece("광합성: 빛으로 양분을 만드는 과정", 50, 700), piece("목차", 50, 680)]]);
+  const text = pagesToText([[piece("목차", 50, 720), piece("광합성: 빛으로 양분을 만드는 과정", 50, 700)]]);
   const rows = parseLines(text, ":");
   const preview = buildPreview(rows, [], "생명과학");
   assert.deepEqual(preview.counts, { ok: 1, duplicate: 0, invalid: 1 }); // the heading has no separator
   assert.equal(preview.toAdd[0].term, "광합성");
+});
+
+/* ---------- PDF import: wrapped lines ---------- */
+// A page whose text area runs from x=50 to x=500 (450 wide), letters 10 high, lines 14 apart.
+const full = (str, y) => piece(str, 50, y, 450); // a line that reaches the right edge
+const part = (str, y, width = str.length * 10) => piece(str, 50, y, width); // a shorter line
+
+test("pdf wrap: the rest of a wrapped definition joins the line above (Korean broken inside a word, no space)", () => {
+  const lines = rebuildLines([
+    full("DNS: 도메인 이름을 IP 주소로 바꿔 주는 시", 700),
+    part("스템", 686),
+    part("방화벽: 들어오고 나가는 통신을 막는 장치", 660),
+  ]);
+  assert.deepEqual(lines, ["DNS: 도메인 이름을 IP 주소로 바꿔 주는 시스템", "방화벽: 들어오고 나가는 통신을 막는 장치"]);
+});
+test("pdf wrap: two wrapped lines in a row end up as one line", () => {
+  const lines = rebuildLines([
+    full("프록시: 사용자를 대신해 요청을 전달하고 결과를 저", 700),
+    full("장해 두었다가 같은 요청이 오면 다시 쓰는 서버로 속도를 높이는 것", 686),
+    part("이 서버", 672),
+    part("다음: 정의", 640),
+  ]);
+  assert.deepEqual(lines, [
+    "프록시: 사용자를 대신해 요청을 전달하고 결과를 저장해 두었다가 같은 요청이 오면 다시 쓰는 서버로 속도를 높이는 것이 서버",
+    "다음: 정의",
+  ]);
+});
+test("pdf wrap: a space is kept when the break had one, or between Latin words", () => {
+  const withSpace = rebuildLines([full("가: 앞부분 ", 700), part("뒷부분", 686), part("나: 다음", 660)]);
+  assert.equal(withSpace[0], "가: 앞부분 뒷부분");
+  const latin = rebuildLines([full("TCP: a reliable transport protocol used by the web", 700), part("browser", 686), part("나: 다음", 660)]);
+  assert.equal(latin[0], "TCP: a reliable transport protocol used by the web browser");
+  const mixed = rebuildLines([full("DNS: 이름을 주소로 바꾸는 서버", 700), part("DNS", 686), part("나: 다음", 660)]);
+  assert.equal(mixed[0], "DNS: 이름을 주소로 바꾸는 서버 DNS");
+});
+test("pdf wrap: a short title line is not joined to the line above or below", () => {
+  const lines = rebuildLines([
+    full("정보: 컴퓨터가 처리하는 자료를 가공해서 의미를 갖게 만든 것으로 의사 결정에 쓰이는 값", 740),
+    part("컴퓨터 일반", 700), // a title: the line above is long, but the gap is a paragraph break
+    part("자료: 가공하기 전의 값", 686),
+  ]);
+  assert.deepEqual(lines, [
+    "정보: 컴퓨터가 처리하는 자료를 가공해서 의미를 갖게 만든 것으로 의사 결정에 쓰이는 값",
+    "컴퓨터 일반",
+    "자료: 가공하기 전의 값",
+  ]);
+});
+test("pdf wrap: a really broken line after a SHORT line stays separate (and shows red in the preview)", () => {
+  const lines = rebuildLines([
+    full("정보: 컴퓨터가 처리하는 자료를 가공해서 의미를 갖게 만든 것으로 의사 결정에 쓰이는 값", 700),
+    part("자료: 짧은 정의", 686), // short: it did not wrap
+    part("구분 기호가 빠진 줄", 672),
+  ]);
+  assert.equal(lines.length, 3);
+  assert.equal(lines[2], "구분 기호가 빠진 줄");
+  const preview = buildPreview(parseLines(lines.join("\n"), ":"), [], "S");
+  assert.deepEqual(preview.counts, { ok: 2, duplicate: 0, invalid: 1 });
+});
+test("pdf wrap: a line without a separator under a full-width line WITHOUT separator is not joined", () => {
+  const lines = rebuildLines([full("이 문단은 개념 줄이 아니라 그냥 설명하는 긴 문장이에요 계속 이어지는", 700), part("끝", 686), part("가: 나", 660)]);
+  assert.deepEqual(lines, ["이 문단은 개념 줄이 아니라 그냥 설명하는 긴 문장이에요 계속 이어지는", "끝", "가: 나"]);
+});
+test("pdf wrap: a big vertical gap (new paragraph) is not joined, and a right-aligned date does not stop joining", () => {
+  const far = rebuildLines([full("가: 아주 긴 정의가 오른쪽 끝까지 이어지고 있어요 정말로", 700), part("나머지", 650), part("나: 다음", 600)]);
+  assert.equal(far.length, 3);
+  // one right-aligned date far to the right (x up to 560) among 12 other lines
+  const items = [piece("2026-10-30", 500, 760, 60)];
+  for (let i = 0; i < 6; i++) items.push(part(`개념${i}: 짧은 정의`, 740 - i * 14));
+  items.push(full("긴개념: 오른쪽 끝까지 이어지는 아주 긴 정의의 앞부분이", 640));
+  items.push(part("뒷부분", 626));
+  for (let i = 0; i < 5; i++) items.push(part(`개념${i + 6}: 짧은 정의`, 600 - i * 14));
+  const lines = rebuildLines(items);
+  assert.ok(lines.includes("긴개념: 오른쪽 끝까지 이어지는 아주 긴 정의의 앞부분이뒷부분"), lines.join(" | "));
+});
+test("pdf wrap: lines are only joined within a page", () => {
+  const text = pagesToText([[full("가: 페이지 끝에서 잘린 정의의 앞부분이 이어지", 100)], [part("는 곳", 700)]]);
+  assert.equal(text, "가: 페이지 끝에서 잘린 정의의 앞부분이 이어지\n는 곳");
+});
+test("pdf wrap: the wrapped definition passes the preview as one ok concept", () => {
+  const text = pagesToText([[full("프록시: 사용자를 대신해 요청을 전달하고 결과를 저장해 두는 서", 700), part("버", 686), part("DNS: 이름 풀이", 660)]]);
+  const preview = buildPreview(parseLines(text, ":"), [], "컴활");
+  assert.deepEqual(preview.counts, { ok: 2, duplicate: 0, invalid: 0 });
+  assert.equal(preview.toAdd[0].definition, "사용자를 대신해 요청을 전달하고 결과를 저장해 두는 서버");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
