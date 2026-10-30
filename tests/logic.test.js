@@ -7,6 +7,10 @@ import {
   listSubjects, filterBySubject, resolveSubject, isDuplicate,
   normalizeFilter, groupBySubject, visibleGroups, hasOwnConcepts,
 } from "../js/concepts.js";
+import {
+  PDF_MAX_BYTES, PDF_MAX_PAGES, PDF_MESSAGES, checkPdfFile, checkPageCount, looksScanned,
+  rebuildLines, pagesToText, appendText,
+} from "../js/pdf-text.js";
 import { detectSeparator, parseLines, buildPreview, MAX_IMPORT } from "../js/importer.js";
 import {
   canStartQuiz, pickOptions, weightOf, recordAnswer, buildRound, buildRetry, nextStep, progressLabel,
@@ -1565,6 +1569,66 @@ test("history: records without xpPaid (older saves) show their round XP; xpPaid 
     assert.equal(fixed.length, 1);
     assert.equal(xpShown(fixed[0]), 40);
   }
+});
+
+/* ---------- PDF import (pdf-text.js) ---------- */
+const piece = (str, x, y, width = str.length * 8, extra = {}) =>
+  ({ str, transform: [10, 0, 0, 10, x, y], width, height: 10, ...extra });
+
+test("pdf: file checks accept a normal PDF and reject wrong type, empty and too big", () => {
+  assert.equal(checkPdfFile({ name: "a.pdf", size: 1000, type: "application/pdf" }), null);
+  assert.equal(checkPdfFile({ name: "A.PDF", size: 1000, type: "" }), null); // type missing, name ends in .pdf
+  assert.equal(checkPdfFile({ name: "a.png", size: 1000, type: "image/png" }), PDF_MESSAGES.notPdf);
+  assert.equal(checkPdfFile({ name: "a.pdf", size: 0, type: "application/pdf" }), PDF_MESSAGES.empty);
+  assert.equal(checkPdfFile({ name: "a.pdf", size: PDF_MAX_BYTES, type: "application/pdf" }), null);
+  assert.equal(checkPdfFile({ name: "a.pdf", size: PDF_MAX_BYTES + 1, type: "application/pdf" }), PDF_MESSAGES.tooBig);
+});
+test("pdf: limits are 10 MB and 50 pages", () => {
+  assert.equal(PDF_MAX_BYTES, 10 * 1024 * 1024);
+  assert.equal(PDF_MAX_PAGES, 50);
+  assert.equal(checkPageCount(50), null);
+  assert.match(checkPageCount(51), /51쪽/);
+});
+test("pdf: rebuildLines puts pieces with the same height on one line, a new height starts a new line", () => {
+  const lines = rebuildLines([piece("광합성:", 50, 700), piece("빛으로", 100, 700), piece("리보솜: 합성", 50, 680)]);
+  assert.deepEqual(lines, ["광합성: 빛으로", "리보솜: 합성"]);
+});
+test("pdf: no extra space is added when pieces touch or already have a space", () => {
+  assert.deepEqual(rebuildLines([piece("광합", 50, 700, 16), piece("성", 66, 700, 8)]), ["광합성"]);
+  assert.deepEqual(rebuildLines([piece("개념: ", 50, 700, 48), piece("정의", 120, 700, 16)]), ["개념: 정의"]);
+});
+test("pdf: hasEOL ends a line even at the same height; empty pieces and junk are ignored", () => {
+  const lines = rebuildLines([piece("가", 50, 700, 8, { hasEOL: true }), piece("나", 60, 700), null, 5, { str: 3 }, piece("", 0, 0)]);
+  assert.deepEqual(lines, ["가", "나"]);
+});
+test("pdf: reading order of the pieces is kept (a second column is not mixed into the first)", () => {
+  const lines = rebuildLines([piece("왼쪽1", 50, 700), piece("왼쪽2", 50, 680), piece("오른쪽1", 300, 700), piece("오른쪽2", 300, 680)]);
+  assert.deepEqual(lines, ["왼쪽1", "왼쪽2", "오른쪽1", "오른쪽2"]);
+});
+test("pdf: pagesToText joins pages and drops empty pages", () => {
+  const text = pagesToText([[piece("A: 1", 0, 700)], [], [piece("B: 2", 0, 700)]]);
+  assert.equal(text, "A: 1\nB: 2");
+  assert.equal(pagesToText([]), "");
+});
+test("pdf: looksScanned is true for empty or almost empty text, false for normal text", () => {
+  assert.equal(looksScanned("", 3), true);
+  assert.equal(looksScanned(" \n \n", 1), true);
+  assert.equal(looksScanned("abc", 1), true);
+  assert.equal(looksScanned("광합성: 식물이 빛 에너지로 양분을 만드는 과정 / 리보솜: 단백질을 합성하는 곳", 1), false);
+  assert.equal(looksScanned("가".repeat(30), 50), true); // 30 letters over 50 pages = a scan with a few stray letters
+});
+test("pdf: appendText puts the PDF text below the old text with one blank line", () => {
+  assert.equal(appendText("", "A: 1"), "A: 1");
+  assert.equal(appendText("  \n", "A: 1"), "A: 1");
+  assert.equal(appendText("X: 0", "A: 1"), "X: 0\n\nA: 1");
+  assert.equal(appendText("X: 0\n\n\n", "A: 1"), "X: 0\n\nA: 1");
+});
+test("pdf: the text goes through the same parser and preview as pasted text", () => {
+  const text = pagesToText([[piece("광합성: 빛으로 양분을 만드는 과정", 50, 700), piece("목차", 50, 680)]]);
+  const rows = parseLines(text, ":");
+  const preview = buildPreview(rows, [], "생명과학");
+  assert.deepEqual(preview.counts, { ok: 1, duplicate: 0, invalid: 1 }); // the heading has no separator
+  assert.equal(preview.toAdd[0].term, "광합성");
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
