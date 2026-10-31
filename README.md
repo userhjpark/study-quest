@@ -9,7 +9,7 @@ The app was first called "Study Quest", so the repo name is still `study-quest`.
 
 This is a study game for students who find it hard to stay motivated. You type "concept: definition" pairs for any subject. The site turns them into quizzes. Studying gives XP, coins, and levels. You spend coins on a pet and its hats, colors, and glasses.
 
-The app uses no AI and no paid service, so it is free to use. I built it with Claude Code. All code is plain HTML, CSS, and JavaScript, written from scratch.
+The app itself does not call any AI or paid service, so it is free for students to use. I built it with Claude Code. All code is plain HTML, CSS, and JavaScript, written from scratch.
 
 I get bored when I memorize by rereading my notes, and I study better when there is a reward. I wanted a free tool that works with whatever subject I am studying, not one fixed course.
 
