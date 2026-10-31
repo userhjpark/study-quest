@@ -467,7 +467,7 @@ export function showResult({ correct, total, missedTerms, retryTotal, retryCorre
   rewardEl.textContent = reward.text;
   rewardEl.classList.toggle("is-capped", reward.capped);
   $("result-checkin").textContent = reward.checkInText;
-  $("result-pet").textContent = petLine;
+  setPetRow("result-pet-row", "result-pet", petLine);
   $("result-correct").textContent = `${total}문제 중 ${correct}문제 정답`;
   const retry = $("result-retry");
   retry.hidden = retryTotal === 0;
@@ -603,7 +603,20 @@ export function showTheme(theme, explicit) {
 export function setFocusPetLines({ idle, running, done }) {
   $("focus-idle-line").textContent = idle;
   $("focus-pet-line").textContent = running;
-  $("focus-done-line").textContent = done;
+  setPetRow("focus-done-row", "focus-done-line", done);
+}
+
+// A pet line with the small pet beside it; the whole row is hidden when the line is empty.
+function setPetRow(rowId, lineId, text) {
+  $(lineId).textContent = text;
+  $(rowId).hidden = text === "";
+}
+
+// The pet's name under "Lv N" in the header (hidden until a pet is chosen).
+export function setProfilePetName(name) {
+  const el = $("profile-pet-name");
+  el.textContent = name;
+  el.hidden = name === "";
 }
 
 export function showFocus(phase) {

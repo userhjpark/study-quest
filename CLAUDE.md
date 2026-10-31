@@ -135,6 +135,7 @@ All code must be written from scratch in this repo. No templates, no reused code
 - localStorage-based XP cap, coins, and streaks can be bypassed by editing browser data or changing the device clock. Only a server-side check (such as the dropped leaderboard idea) could limit this, and even that can only bound score jumps.
 - Data lives per browser/device; clearing site data erases progress.
 - Subjects cannot be renamed or deleted; a subject exists as long as it has concepts.
+- Concepts cannot be edited: to change one, delete it and add it again (decision Nov 1: no concept editing).
 - If the site is open in two tabs at once, one tab can overwrite progress saved by the other, because each tab keeps its own copy in memory (seen on Oct 29: a finished round overwrote a value changed in the console without a reload). Use one tab at a time.
 - XP and coins are given when a round finishes; quitting midway gives nothing.
 - Coins are not limited by the daily cap (only XP is).

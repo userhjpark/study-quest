@@ -26,7 +26,10 @@
     <div class="profile" aria-label="내 정보">
       <div class="profile-row">
         <button id="header-avatar" class="header-avatar" type="button" aria-label="내 캐릭터 열기"></button>
-        <strong id="profile-level">Lv 1</strong>
+        <div class="profile-who">
+          <strong id="profile-level">Lv 1</strong>
+          <span id="profile-pet-name" class="profile-pet-name" hidden></span>
+        </div>
         <div id="xp-bar" class="xp-bar" role="progressbar" aria-label="경험치" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="xp-fill" class="xp-fill"></div>
         </div>
@@ -114,7 +117,10 @@
         <div id="focus-done" hidden>
           <div class="focus-avatar"></div>
           <h2>집중 완료!</h2>
-          <p id="focus-done-line" class="pet-line"></p>
+          <div id="focus-done-row" class="pet-row" hidden>
+            <span class="mini-avatar"></span>
+            <p id="focus-done-line" class="pet-line"></p>
+          </div>
           <p id="focus-reward" class="result-reward" role="status"></p>
           <p id="focus-checkin" class="result-reward" role="status"></p>
           <label for="done-subject-select">퀴즈 과목</label>
@@ -224,7 +230,10 @@
 
         <div id="quiz-result" hidden>
           <h2>라운드 완료!</h2>
-          <p id="result-pet" class="pet-line"></p>
+          <div id="result-pet-row" class="pet-row" hidden>
+            <span class="mini-avatar"></span>
+            <p id="result-pet" class="pet-line"></p>
+          </div>
           <p id="result-correct" class="result-big"></p>
           <p id="result-reward" class="result-reward" role="status"></p>
           <p id="result-checkin" class="result-reward" role="status"></p>

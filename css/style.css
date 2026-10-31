@@ -448,6 +448,12 @@ details.card summary {
 .profile { margin-bottom: 10px; padding: 10px 12px 6px; border-radius: 18px; background: var(--cream); }
 .profile-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .profile-row > span { white-space: nowrap; }
+.profile-who { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.profile-pet-name { max-width: 6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; color: var(--muted); }
+.pet-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0 12px; }
+.pet-row[hidden] { display: none; }
+.pet-row .pet-line { margin: 0; text-align: left; }
+.mini-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--avatar-bg); }
 .profile-small { font-size: 0.85rem; white-space: nowrap; }
 .xp-bar { flex: 1; height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; }
 .xp-fill { height: 100%; width: 0; border-radius: 6px; background: var(--accent); transition: width 0.3s; }

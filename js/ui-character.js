@@ -105,6 +105,11 @@ export function renderFocusAvatar(character) {
   document.querySelectorAll(".focus-avatar").forEach((el) => el.replaceChildren(createAvatar(character)));
 }
 
+// The small pet (40px) beside the happy lines on the quiz result and 집중 완료 screens.
+export function renderMiniAvatars(character) {
+  document.querySelectorAll(".mini-avatar").forEach((el) => el.replaceChildren(createAvatar(character, 40)));
+}
+
 export function renderHeaderAvatar(character) {
   $("header-avatar").replaceChildren(createAvatar(character));
 }
